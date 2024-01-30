@@ -237,11 +237,20 @@ do -- Tuple
 			end
 		end
 
-		if -- compare var-arg
-			superset.var_arg and
-			(not subset.var_arg or not subset.var_arg:is_subset(superset.var_arg))
-		then
-			return false
+		-- compare var-arg
+		local super_var_arg = superset.var_arg
+		if super_var_arg then
+			local sub_var_arg = subset.var_arg
+			if not sub_var_arg or not sub_var_arg:is_subset(super_var_arg) then
+				return false
+			end
+
+			for i = #superset.types + 1, #subset.types do
+				local sub_type = subset.types[i]
+				if not sub_type:is_subset(super_var_arg) then
+					return false
+				end
+			end
 		end
 
 		return true

@@ -43,3 +43,15 @@ describe 'Tuple', ->
 			var_tup_B = Tuple {}, B
 
 			assert.is_false var_tup_A\is_subset var_tup_B
+
+		it 'accepts var-args if they are subsets', ->
+			var_tup1 = Tuple { A }, A
+			var_tup2 = Tuple {}, A
+
+			assert.is_true var_tup1\is_subset var_tup2
+
+		it 'rejects var-args if latter non-var-args are not subsets', ->
+			long_tup = Tuple { A, B }, A
+			short_tup = Tuple { A }, A
+
+			assert.is_false long_tup\is_subset short_tup
