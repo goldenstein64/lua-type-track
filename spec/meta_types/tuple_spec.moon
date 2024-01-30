@@ -27,7 +27,19 @@ describe 'Tuple', ->
 			assert.is_false tup2\is_subset tup1
 
 		it 'compares its first element to a non-tuple', ->
-			tupA = Tuple { A }
-			tupB = Tuple { B }
-			assert.is_true tupA\is_subset A
-			assert.is_false tupB\is_subset A
+			tup_A = Tuple { A }
+			tup_B = Tuple { B }
+			assert.is_true tup_A\is_subset A
+			assert.is_false tup_B\is_subset A
+
+		it 'rejects var-args if it doesn\'t have one', ->
+			long_tup = Tuple { A, A, A }
+			var_tup = Tuple {}, A
+
+			assert.is_false long_tup\is_subset var_tup
+
+		it 'rejects var-args if they are not subsets', ->
+			var_tup_A = Tuple {}, A
+			var_tup_B = Tuple {}, B
+
+			assert.is_false var_tup_A\is_subset var_tup_B
