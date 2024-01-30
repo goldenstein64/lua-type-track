@@ -1,4 +1,4 @@
-local meta_types = require("type-track.meta-types")
+local meta_types = require("type-track.meta_types")
 
 local Tuple, Callable, Object, Union, Intersection, Literal =
 	meta_types.Tuple, meta_types.Callable, meta_types.Object,
