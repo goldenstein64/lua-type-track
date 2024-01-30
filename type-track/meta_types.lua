@@ -231,13 +231,16 @@ do -- Tuple
 	local function compare_tuple(subset, superset)
 		-- compare element-wise
 		for i, super_type in ipairs(superset.types) do
-			local sub_type = assert(subset:at(i))
-			if not sub_type:is_subset(super_type) then
+			local sub_type = subset:at(i)
+			if not sub_type or not sub_type:is_subset(super_type) then
 				return false
 			end
 		end
 
-		if not subset.var_arg:is_subset(superset.var_arg) then
+		if -- compare var-arg
+			superset.var_arg and
+			(not subset.var_arg or not subset.var_arg:is_subset(superset.var_arg))
+		then
 			return false
 		end
 
