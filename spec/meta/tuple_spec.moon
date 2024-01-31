@@ -1,4 +1,4 @@
-import Type, Tuple, Literal from require 'type-track.meta_types'
+import Type, Tuple, Literal from require 'type-track.meta'
 
 describe 'Tuple', ->
 	it 'is a Type', ->

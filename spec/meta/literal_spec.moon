@@ -1,4 +1,4 @@
-import Type, Literal from require 'type-track.meta_types'
+import Type, Literal from require 'type-track.meta'
 
 describe 'literals', ->
 	it 'is a Type', ->
