@@ -1,6 +1,10 @@
-import Tuple, Literal from require 'type-track.meta_types'
+import Type, Tuple, Literal from require 'type-track.meta_types'
 
 describe 'Tuple', ->
+	it 'is a Type', ->
+		tup = Tuple {}
+		assert.is_true tup\is_instance Type
+
 	-- local A, B, C = "A", "B", "C"
 	A = Literal 'A'
 	B = Literal 'B'

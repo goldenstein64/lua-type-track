@@ -1,6 +1,11 @@
-import Literal from require 'type-track.meta_types'
+import Type, Literal from require 'type-track.meta_types'
 
 describe 'literals', ->
+	it 'is a Type', ->
+		A = Literal 'A'
+
+		assert.is_true A\is_instance Type
+
 	describe 'is_subset', ->
 		it 'accepts itself', ->
 			A = Literal 'A'
