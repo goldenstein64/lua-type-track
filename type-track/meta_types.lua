@@ -616,10 +616,12 @@ do -- Literal
 end
 
 return {
-	Tuple =  Tuple,
+	Tuple = Tuple,
 	Callable = Callable,
 	Object = Object,
 	Union = Union,
 	Intersection = Intersection,
 	Literal = Literal,
+
+	Type = Type,
 }
