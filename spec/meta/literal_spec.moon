@@ -18,3 +18,16 @@ describe 'literals', ->
 
 			assert.is_false A\is_subset B
 
+	describe 'at', ->
+		it 'returns itself on 1', ->
+			A = Literal 'A'
+
+			assert.equal A, A\at 1
+
+		it 'returns nil otherwise', ->
+			A = Literal 'A'
+
+			assert.is_nil A\at 2
+			assert.is_nil A\at 3
+			assert.is_nil A\at 4
+
