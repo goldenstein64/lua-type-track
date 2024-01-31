@@ -17,7 +17,9 @@ function Inheritable:is_instance(cls)
 	return obj_cls == cls
 end
 
----describes how arguments and return values are structured
+---a multi-value type
+---
+---Importantly, it describes how arguments and return values are structured.
 ---@class type-track.Tuple.Class
 ---@overload fun(types: type-track.Type[], var_arg?: type-track.Type): type-track.Tuple
 local Tuple
@@ -82,7 +84,7 @@ do -- Type
 
 	---attempts to call this type
 	---
-	---If `params` is a `Tuple`, it should be type-checked against. If it's `nil`,
+	---If `params` is a `Type`, it should be type-checked against. If it's `nil`,
 	---a generic return value should be given.
 	---
 	---If `nil` is returned, the call wasn't compatible. Otherwise, a return type
@@ -104,6 +106,8 @@ do -- Type
 		return i == 1 and self or nil
 	end
 
+	---returns a union of its operands. This will concatenate unions when
+	---possible.
 	---@param other type-track.Type
 	---@return type-track.Union
 	function TypeInst:__add(other)
@@ -129,6 +133,8 @@ do -- Type
 		return Union(values)
 	end
 
+	---returns an intersection of its operands. This will concatenate
+	---intersections when possible.
 	---@param other type-track.Type
 	---@return type-track.Intersection
 	function TypeInst:__mul(other)
@@ -154,6 +160,8 @@ do -- Type
 		return Intersection(values)
 	end
 
+	---returns a callable `(self) -> (other)`. An `__rsh` overload would look
+	---best, but LuaJIT doesn't support it.
 	---@param other type-track.Type
 	---@return type-track.Callable
 	function TypeInst:__div(other)
@@ -171,6 +179,7 @@ do -- Type
 	end
 end
 
+---accepts a type `actual` if it is a subset of all types in `list`
 ---@param actual type-track.Type
 ---@param list type-track.Type[]
 ---@return boolean
@@ -184,6 +193,7 @@ local function all_types(actual, list)
 	return true
 end
 
+---accepts a type `actual` if it is a subset of any type in `list`
 ---@param actual type-track.Type
 ---@param list type-track.Type[]
 ---@return boolean
@@ -503,8 +513,8 @@ do -- Union
 			end
 		end
 
-		-- if we get here, the call has succeeded... what should the return types
-		-- be?
+		-- if we get here, the call has succeeded...
+		-- what should the return types be?
 		--[[
 			a: () -> string
 			b: () -> number
