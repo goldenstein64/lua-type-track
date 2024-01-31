@@ -1,12 +1,12 @@
 import Tuple, Literal from require 'type-track.meta_types'
 
 describe 'Tuple', ->
-	describe 'is_subset', ->
-		-- local A, B, C = "A", "B", "C"
-		A = Literal 'A'
-		B = Literal 'B'
-		C = Literal 'C'
+	-- local A, B, C = "A", "B", "C"
+	A = Literal 'A'
+	B = Literal 'B'
+	C = Literal 'C'
 
+	describe 'is_subset', ->
 		it 'accepts shorter tuples #only', ->
 			short_tup = Tuple { A, B }
 			long_tup = Tuple { A, B, C }
@@ -55,3 +55,26 @@ describe 'Tuple', ->
 			short_tup = Tuple { A }, A
 
 			assert.is_false long_tup\is_subset short_tup
+
+	describe 'at', ->
+		it 'returns its types by index', ->
+			tup = Tuple { A, B, C }
+
+			assert.equal A, tup\at 1
+			assert.equal B, tup\at 2
+			assert.equal C, tup\at 3
+
+		it 'returns var-args after its length is exceeded', ->
+			tup = Tuple { A }, B
+
+			assert.equal A, tup\at 1
+			assert.equal B, tup\at 2
+			assert.equal B, tup\at 3
+			assert.equal B, tup\at 4
+
+		it 'returns nil if var-args is nil', ->
+			tup = Tuple { A, B }
+
+			assert.equal A, tup\at 1
+			assert.equal B, tup\at 2
+			assert.is_nil tup\at 3
