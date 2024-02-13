@@ -16,6 +16,10 @@ describe 'callable', ->
 		assert.is_true func\is_instance Type
 
 	describe 'is_subset', ->
+		it 'can accept tuples by comparing its first element', ->
+			func = Callable never, never
+			assert.is_true func\is_subset Tuple { func }
+
 		it 'accepts a callable with a subset of args', ->
 			func2 = Callable AB, never
 			func3 = Callable ABC, never
@@ -38,7 +42,3 @@ describe 'callable', ->
 
 			assert.is_true func32\is_subset func23
 			assert.is_false func23\is_subset func32
-
-		it 'accepts tuples if its first element is accepted', ->
-			func = Callable never, never
-			assert.is_true func\is_subset Tuple { func }
