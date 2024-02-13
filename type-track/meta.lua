@@ -57,10 +57,10 @@ local Literal
 local Type
 
 ---@type fun(actual: type-track.Type, list: type-track.Type[]): boolean
-local any_types
+local is_subset_of_any
 
 ---@type fun(actual: type-track.Type, list: type-track.Type[]): boolean
-local all_types
+local is_subset_of_all
 
 ---determines whether `subtype` is a subset of `supertype`. This operation is
 ---available across all
@@ -103,10 +103,10 @@ local function is_subset(subset, superset)
 		end
 	elseif super_cls == Union then
 		---@cast superset type-track.Union
-		return any_types(subset, superset.types)
+		return is_subset_of_any(subset, superset.types)
 	elseif super_cls == Intersection then
 		---@cast superset type-track.Intersection
-		return all_types(subset, superset.types)
+		return is_subset_of_all(subset, superset.types)
 	elseif sub_cls == Tuple then
 		---@cast subset type-track.Tuple
 		local first_elem = subset:at(1)
@@ -182,7 +182,7 @@ end
 ---@param actual type-track.Type
 ---@param list type-track.Type[]
 ---@return boolean
-function all_types(actual, list)
+function is_subset_of_all(actual, list)
 	for _, expected in ipairs(list) do
 		if not is_subset(actual, expected) then
 			return false
@@ -196,7 +196,7 @@ end
 ---@param actual type-track.Type
 ---@param list type-track.Type[]
 ---@return boolean
-function any_types(actual, list)
+function is_subset_of_any(actual, list)
 	for _, expected in ipairs(list) do
 		if is_subset(actual, expected) then
 			return true
@@ -568,7 +568,7 @@ do -- Union
 	---@return boolean
 	function Union.is_subset(subset, superset)
 		for _, subtype in ipairs(subset.types) do
-			if not any_types(subtype, superset.types) then
+			if not is_subset_of_any(subtype, superset.types) then
 				return false
 			end
 		end
@@ -653,7 +653,7 @@ do -- Intersection
 	---@return boolean
 	function Intersection.is_subset(subset, superset)
 		for _, supertype in ipairs(superset.types) do
-			if not any_types(supertype, subset.types) then
+			if not is_subset_of_any(supertype, subset.types) then
 				return false
 			end
 		end
