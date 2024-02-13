@@ -4,7 +4,7 @@ local muun = require("type-track.muun")
 
 ---@class Inheritable
 ---@field __class any
-local Inheritable = muun("Object")
+local Inheritable = muun("Inheritable")
 
 ---@param cls any
 ---@return boolean
@@ -17,9 +17,8 @@ function Inheritable:is_instance(cls)
 	return obj_cls == cls
 end
 
----a multi-value type
----
----Importantly, it describes how arguments and return values are structured.
+---a multi-value type. Importantly, it describes how arguments and return
+---values are structured.
 ---@class type-track.Tuple.Class
 ---@overload fun(types: type-track.Type[], var_arg?: type-track.Type): type-track.Tuple
 local Tuple
@@ -436,9 +435,9 @@ do -- Object
 			---@cast superset type-track.Object
 			if self.datatype ~= superset.datatype then return false end
 
-			for op, impl in pairs(self.ops) do
-				local super_impl = superset.ops[op]
-				if not impl:is_subset(super_impl) then
+			for op, super_impl in pairs(superset.ops) do
+				local impl = self.ops[op]
+				if not impl or not impl:is_subset(super_impl) then
 					return false
 				end
 			end
@@ -611,13 +610,6 @@ do -- Literal
 		end
 
 		return Literal.__super.is_subset(self, superset)
-	end
-
-	---@param params type-track.Type[]?
-	---@param op type-track.op
-	---@return type-track.Type[]? returns
-	function LiteralInst:call(params, op)
-		return Literal.__super.call(self, params, op)
 	end
 end
 
