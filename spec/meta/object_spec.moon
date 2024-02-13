@@ -52,7 +52,7 @@ describe 'object', ->
 
 			assert.equal B, obj\call A
 
-		it 'supports additional operations as a second argument', ->
+		it 'supports additional operations with a second argument', ->
 			obj = Object { index: A / B }
 
 			assert.equal B, obj\call A, 'index'
