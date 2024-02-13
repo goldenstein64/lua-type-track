@@ -1,4 +1,4 @@
-import Literal, Object, Tuple, Callable, Type from require 'type-track.meta'
+import Literal, Object, Tuple, Type from require 'type-track.meta'
 
 describe 'object', ->
 	A = Literal 'A'
@@ -46,3 +46,13 @@ describe 'object', ->
 			obj = Object!
 
 			assert.is_nil obj\call!
+
+		it 'returns a type if the call operation is supported', ->
+			obj = Object { call: A / B }
+
+			assert.equal B, obj\call A
+
+		it 'supports additional operations as a second argument', ->
+			obj = Object { index: A / B }
+
+			assert.equal B, obj\call A, 'index'
