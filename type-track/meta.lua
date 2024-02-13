@@ -210,7 +210,6 @@ do -- Tuple
 	---@class type-track.Tuple : type-track.Type
 	---@field types type-track.Type[]
 	---@field var_arg type-track.Type?
-	---@operator pow(type-track.Type | integer): type-track.Tuple
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator div(type-track.Type): type-track.Callable
 	---@operator add(type-track.Type): type-track.Union
@@ -299,7 +298,6 @@ do -- Callable
 	---@class type-track.Callable : type-track.Type
 	---@field params type-track.Type
 	---@field returns type-track.Type
-	---@operator pow(type-track.Type | integer): type-track.Tuple
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator div(type-track.Type): type-track.Callable
 	---@operator add(type-track.Type): type-track.Union
@@ -363,7 +361,6 @@ do -- Object
 	---@class type-track.Object : type-track.Type
 	---@field ops type-track.Object.ops
 	---@field datatype? string
-	---@operator pow(type-track.Type | integer): type-track.Tuple
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator div(type-track.Type): type-track.Callable
 	---@operator add(type-track.Type): type-track.Union
@@ -475,7 +472,6 @@ end
 do -- Union
 	---@class type-track.Union : type-track.Type
 	---@field types type-track.Type[]
-	---@operator pow(type-track.Type | integer): type-track.Tuple
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator div(type-track.Type): type-track.Callable
 	---@operator add(type-track.Type): type-track.Union
@@ -548,7 +544,6 @@ end
 do -- Intersection
 	---@class type-track.Intersection : type-track.Type
 	---@field types type-track.Type[]
-	---@operator pow(type-track.Type | integer): type-track.Tuple
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator div(type-track.Type): type-track.Callable
 	---@operator add(type-track.Type): type-track.Union
@@ -585,7 +580,6 @@ end
 do -- Literal
 	---@class type-track.Literal : type-track.Object
 	---@field value unknown
-	---@operator pow(type-track.Type | integer): type-track.Tuple
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator div(type-track.Type): type-track.Callable
 	---@operator add(type-track.Type): type-track.Union
