@@ -345,7 +345,13 @@ do -- Callable
 	---@param params? type-track.Type
 	---@return type-track.Type? returns
 	function CallableInst:call(params)
-		if not params or params:is_subset(self.params) then
+		if not params then return self.returns end
+
+		if not params:is_instance(Tuple) then
+			params = Tuple({params})
+		end
+
+		if params:is_subset(self.params) then
 			return self.returns
 		else
 			return nil

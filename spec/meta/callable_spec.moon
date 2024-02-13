@@ -42,3 +42,14 @@ describe 'callable', ->
 
 			assert.is_true func32\is_subset func23
 			assert.is_false func23\is_subset func32
+
+	describe 'call', ->
+		it 'gives a return type when given no arguments', ->
+			func = Callable never, ABC
+
+			assert.equal ABC, func\call!
+
+		it 'gives nil when given an incompatible param type', ->
+			func = Callable AB, ABC
+
+			assert.is_nil func\call Tuple { A }
