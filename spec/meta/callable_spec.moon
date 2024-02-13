@@ -49,6 +49,12 @@ describe 'callable', ->
 
 			assert.equal ABC, func\call!
 
+		it 'gives a return type when given a compatible param type', ->
+			func = Callable AB, ABC
+
+			assert.equal ABC, func\call AB
+			assert.equal ABC, func\call ABC
+
 		it 'gives nil when given an incompatible param type', ->
 			func = Callable AB, ABC
 
