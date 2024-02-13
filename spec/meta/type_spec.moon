@@ -1,7 +1,7 @@
 import Type, Callable, Union, Intersection, Tuple from require 'type-track.meta'
 
 describe 'type', ->
-	it 'creates Callables / operator', ->
+	it 'creates Callables with / operator', ->
 		type1 = Type!
 		type2 = Type!
 
