@@ -17,7 +17,7 @@ describe 'Tuple', ->
 
 		describe 'is_subset', ->
 			it 'accepts shorter tuples', ->
-				-- the latter bits get rejected
+				-- the latter elements get discarded
 				short_tup = Tuple { A, B }
 				long_tup = Tuple { A, B, C }
 
