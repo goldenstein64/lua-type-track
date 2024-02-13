@@ -346,6 +346,29 @@ do -- Tuple
 	---@param superset type-track.Tuple
 	---@return boolean
 	function Tuple.is_subset(subset, superset)
+		local sub_var_arg = subset.var_arg
+		local super_var_arg = superset.var_arg
+
+		-- by default, latter elements in a tuple are discarded, meaning anything
+		-- can be entered there without an error
+		if sub_var_arg and not super_var_arg then
+			return false
+		end
+
+		-- calling a function with less arguments than required is illegal
+		if not sub_var_arg and super_var_arg
+			and #subset.types > #superset.types
+		then
+			return false
+		end
+
+		-- calling a function with mismatching var-args is illegal
+		if sub_var_arg and super_var_arg
+			and not is_subset(sub_var_arg, super_var_arg)
+		then
+			return false
+		end
+
 		-- compare element-wise
 		for i, super_type in ipairs(superset.types) do
 			local sub_type = subset:at(i)
@@ -355,13 +378,8 @@ do -- Tuple
 		end
 
 		-- compare var-arg
-		local super_var_arg = superset.var_arg
 		if super_var_arg then
-			local sub_var_arg = subset.var_arg
-			if not sub_var_arg or not is_subset(sub_var_arg, super_var_arg) then
-				return false
-			end
-
+			---@cast sub_var_arg type-track.Type
 			for i = #superset.types + 1, #subset.types do
 				local sub_type = subset.types[i]
 				if not is_subset(sub_type, super_var_arg) then
@@ -376,7 +394,7 @@ do -- Tuple
 	---@param i integer
 	---@return type-track.Type?
 	function TupleInst:at(i)
-		return self.types[i] or self.var_arg
+		return self.types[i] or self.var_arg or Tuple.default_var_arg
 	end
 
 	---@param params? type-track.Type

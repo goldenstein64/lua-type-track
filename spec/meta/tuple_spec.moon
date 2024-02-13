@@ -17,6 +17,7 @@ describe 'Tuple', ->
 
 		describe 'is_subset', ->
 			it 'accepts shorter tuples', ->
+				-- the latter bits get rejected
 				short_tup = Tuple { A, B }
 				long_tup = Tuple { A, B, C }
 
@@ -35,12 +36,34 @@ describe 'Tuple', ->
 				assert.is_false Tuple.is_subset tup1, tup2
 				assert.is_false Tuple.is_subset tup2, tup1
 
-			-- shouldn't this be accepted?
-			it 'rejects var-args if it doesn\'t have one', ->
+			it 'accepts var-args if subset has equal elements', ->
+				long_tup = Tuple { A, A, A }
+				long_var_tup = Tuple { A, A, A }, A
+
+				assert.is_true Tuple.is_subset long_tup, long_var_tup
+
+			it 'rejects subsets with no var-args and supersets with var-args if' ..
+				' superset has less elements', ->
+				-- long: (A, A, A) -> ()
+				-- var: (...A) -> ()
+				--
+				-- var = long -- if this was accepted, then
+				-- var(A) -- this would be acceptable, but it's not
 				long_tup = Tuple { A, A, A }
 				var_tup = Tuple {}, A
 
 				assert.is_false Tuple.is_subset long_tup, var_tup
+
+			it 'rejects subsets with var-args and supersets without var-args', ->
+				-- var: (...A) -> ()
+				-- long: (A, A, A) -> ()
+				--
+				-- long = var -- if this was accepted, then
+				-- long(A, A, A, anything) -- this would be acceptable, but it's not
+				var_tup = Tuple {}, A
+				long_tup = Tuple { A, A, A }
+
+				assert.is_false Tuple.is_subset var_tup, long_tup
 
 			it 'rejects var-args if they are not subsets', ->
 				var_tup_A = Tuple {}, A
