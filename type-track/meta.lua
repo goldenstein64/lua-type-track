@@ -20,6 +20,7 @@ end
 ---a multi-value type. Importantly, it describes how arguments and return
 ---values are structured.
 ---@class type-track.Tuple.Class
+---@field default_var_arg type-track.Type?
 ---@overload fun(types: type-track.Type[], var_arg?: type-track.Type): type-track.Tuple
 local Tuple
 
@@ -46,6 +47,7 @@ local Intersection
 
 ---a type that contains exactly one value
 ---@class type-track.Literal.Class
+---@field __super type-track.Object | fun(self: type-track.Object, ops?: type-track.Object.ops, datatype?: string): type-track.Object
 ---@overload fun(value: unknown, ops?: type-track.Object.ops, datatype?: string): type-track.Literal
 local Literal
 
@@ -53,6 +55,155 @@ local Literal
 ---@field __base any
 ---@overload fun(): type-track.Type
 local Type
+
+---@type fun(actual: type-track.Type, list: type-track.Type[]): boolean
+local any_types
+
+---@type fun(actual: type-track.Type, list: type-track.Type[]): boolean
+local all_types
+
+---determines whether `subtype` is a subset of `supertype`. This operation is
+---available across all
+---@param subtype type-track.Type
+---@param supertype type-track.Type
+---@return boolean
+local function is_subset(subtype, supertype)
+	-- Tuple, Union, Intersection, Object, Callable, Literal
+	-- 36 combinations
+	-- sub-super
+	-- TT TT TT TT TT TT
+	-- UT UU UI UO UC UL
+	-- IT IU II IO IC IL
+	-- OT OU OI OO OC OL
+	-- CT CU CI CO CC CL
+	-- LT LU LI LO LC LL
+
+	-- If both types have the same class, their respective compare method is
+	-- used. Otherwise, coerce the types to something else and compare that?
+	local sub_cls = subtype.__class
+	local super_cls = supertype.__class
+	if sub_cls == super_cls then
+		return sub_cls.is_subset(subtype, supertype)
+	elseif super_cls == Tuple then
+		---@cast supertype type-track.Tuple
+		if #supertype.types == 0 then
+			return not supertype.var_arg or is_subset(subtype, supertype.var_arg)
+		elseif #supertype.types == 1 then
+			return is_subset(subtype, supertype.types[1])
+		elseif Tuple.default_var_arg then
+			for i = 2, #supertype.types do
+				local super_elem = supertype.types[i]
+				if not is_subset(Tuple.default_var_arg, super_elem) then
+					return false
+				end
+			end
+
+			return is_subset(subtype, supertype.types[1])
+		end
+	elseif super_cls == Union then
+		---@cast supertype type-track.Union
+		return any_types(subtype, supertype.types)
+	elseif super_cls == Intersection then
+		---@cast supertype type-track.Intersection
+		return all_types(subtype, supertype.types)
+	elseif sub_cls == Tuple then
+		---@cast subtype type-track.Tuple
+		local first_elem = subtype:at(1)
+		if first_elem then
+			return is_subset(first_elem, supertype)
+		end
+	elseif sub_cls == Union then
+		---@cast subtype type-track.Union
+		for _, t in ipairs(subtype.types) do
+			if not is_subset(t, supertype) then
+				return false
+			end
+		end
+
+		return true
+	elseif sub_cls == Intersection then
+		---@cast subtype type-track.Intersection
+		for _, t in ipairs(subtype.types) do
+			if is_subset(t, supertype) then
+				return true
+			end
+		end
+	elseif sub_cls == Literal then
+		---@cast subtype type-track.Literal
+		if super_cls == Object then
+			---@cast supertype type-track.Object
+			return Object.is_subset(subtype, supertype)
+		elseif super_cls == Callable then
+			---@cast supertype type-track.Callable
+			local call_impl = subtype.ops.call
+			if call_impl then
+				return is_subset(call_impl, supertype)
+			end
+		end
+	elseif sub_cls == Object then
+		---@cast subtype type-track.Object
+		if super_cls == Callable then
+			---@cast supertype type-track.Callable
+			local call_impl = subtype.ops.call
+			if call_impl then
+				return is_subset(call_impl, supertype)
+			end
+		end
+	elseif sub_cls == Callable then
+		---@cast subtype type-track.Callable
+		if super_cls == Object then
+			---@cast supertype type-track.Object
+
+			-- a Callable is essentially an object with only a call operation
+			-- so if any of the supertype's operations aren't calls, it can't be a
+			-- subset
+			for op in pairs(supertype.ops) do
+				if op ~= "call" then
+					return false
+				end
+			end
+
+			local call_impl = supertype.ops.call
+			if call_impl then
+				return is_subset(subtype, call_impl)
+			else
+				-- if the supertype doesn't have a call op, it's just a symbol, but
+				-- Callables can be treated as symbols too.
+				return true
+			end
+		end
+	end
+
+	return false
+end
+
+---accepts a type `actual` if it is a subset of all types in `list`
+---@param actual type-track.Type
+---@param list type-track.Type[]
+---@return boolean
+function all_types(actual, list)
+	for _, expected in ipairs(list) do
+		if not is_subset(actual, expected) then
+			return false
+		end
+	end
+
+	return true
+end
+
+---accepts a type `actual` if it is a subset of any type in `list`
+---@param actual type-track.Type
+---@param list type-track.Type[]
+---@return boolean
+function any_types(actual, list)
+	for _, expected in ipairs(list) do
+		if is_subset(actual, expected) then
+			return true
+		end
+	end
+
+	return false
+end
 
 do -- Type
 	---@class type-track.Type : Inheritable
@@ -63,22 +214,8 @@ do -- Type
 
 	Type = TypeInst --[[@as type-track.Type.Class]]
 
-	---whether this type is a subset of `superset`
-	---
-	---A type `A` is a subset of type `B` when:
-	---
-	---- `A` supports the callable `B` such that:
-	---  - `B`'s parameters are a subset of `A`'s parameters
-	---  - `A`'s returns are a subset of `B`'s returns
-	---- `A` supports all operations defined in the object `B`
-	---- All elements of tuple `B` are a superset of corresponding elements in `A`
-	---- `A` is the literal `B`
-	---- `A` satisfies one type in the union `B`
-	---- `A` satisfies all types in the intersection `B`
-	---@param superset type-track.Type
-	---@return boolean
-	function TypeInst:is_subset(superset)
-		error(":is_subset() is not implemented")
+	function Type.is_subset(subset, superset)
+		return false
 	end
 
 	---attempts to call this type
@@ -178,34 +315,6 @@ do -- Type
 	end
 end
 
----accepts a type `actual` if it is a subset of all types in `list`
----@param actual type-track.Type
----@param list type-track.Type[]
----@return boolean
-local function all_types(actual, list)
-	for _, expected in ipairs(list) do
-		if not actual:is_subset(expected) then
-			return false
-		end
-	end
-
-	return true
-end
-
----accepts a type `actual` if it is a subset of any type in `list`
----@param actual type-track.Type
----@param list type-track.Type[]
----@return boolean
-local function any_types(actual, list)
-	for _, expected in ipairs(list) do
-		if actual:is_subset(expected) then
-			return true
-		end
-	end
-
-	return false
-end
-
 do -- Tuple
 	---@class type-track.Tuple : type-track.Type
 	---@field types type-track.Type[]
@@ -236,11 +345,11 @@ do -- Tuple
 	---@param subset type-track.Tuple
 	---@param superset type-track.Tuple
 	---@return boolean
-	local function compare_tuple(subset, superset)
+	function Tuple.is_subset(subset, superset)
 		-- compare element-wise
 		for i, super_type in ipairs(superset.types) do
 			local sub_type = subset:at(i)
-			if not sub_type or not sub_type:is_subset(super_type) then
+			if not sub_type or not is_subset(sub_type, super_type) then
 				return false
 			end
 		end
@@ -249,35 +358,19 @@ do -- Tuple
 		local super_var_arg = superset.var_arg
 		if super_var_arg then
 			local sub_var_arg = subset.var_arg
-			if not sub_var_arg or not sub_var_arg:is_subset(super_var_arg) then
+			if not sub_var_arg or not is_subset(sub_var_arg, super_var_arg) then
 				return false
 			end
 
 			for i = #superset.types + 1, #subset.types do
 				local sub_type = subset.types[i]
-				if not sub_type:is_subset(super_var_arg) then
+				if not is_subset(sub_type, super_var_arg) then
 					return false
 				end
 			end
 		end
 
 		return true
-	end
-
-	---@param superset type-track.Type
-	---@return boolean
-	function TupleInst:is_subset(superset)
-		if superset:is_instance(Tuple) then
-			---@cast superset type-track.Tuple
-			return compare_tuple(self, superset)
-		else -- compare just the first element
-			local first_type = self:at(1)
-			if first_type then
-				return first_type:is_subset(superset)
-			else
-				return false
-			end
-		end
 	end
 
 	---@param i integer
@@ -313,30 +406,12 @@ do -- Callable
 		self.returns = returns
 	end
 
-	---@param superset type-track.Type
+	---@param subset type-track.Callable
+	---@param superset type-track.Callable
 	---@return boolean
-	function CallableInst:is_subset(superset)
-		if superset:is_instance(Callable) then
-			---@cast superset type-track.Callable
-			return self.params:is_subset(superset.params)
-				and superset.returns:is_subset(self.returns)
-		elseif superset:is_instance(Union) then
-			---@cast superset type-track.Union
-			return any_types(self, superset.types)
-		elseif superset:is_instance(Intersection) then
-			---@cast superset type-track.Intersection
-			return all_types(self, superset.types)
-		elseif superset:is_instance(Tuple) then
-			---@cast superset type-track.Tuple
-			local super_first = superset:at(1)
-			return super_first and self:is_subset(super_first) or false
-		elseif superset:is_instance(Object) then
-			---@cast superset type-track.Object
-			local super_call_impl = superset.ops.call
-			return super_call_impl and self:is_subset(super_call_impl) or false
-		end
-
-		return false
+	function Callable.is_subset(subset, superset)
+		return is_subset(subset.params, superset.params)
+			and is_subset(superset.returns, subset.returns)
 	end
 
 	---@param params? type-track.Type
@@ -348,7 +423,7 @@ do -- Callable
 			params = Tuple({params})
 		end
 
-		if params:is_subset(self.params) then
+		if is_subset(params, self.params) then
 			return self.returns
 		else
 			return nil
@@ -425,38 +500,20 @@ do -- Object
 		self.datatype = datatype
 	end
 
-	---@param superset type-track.Type
+	---@param subset type-track.Object
+	---@param superset type-track.Object
 	---@return boolean
-	function ObjectInst:is_subset(superset)
-		if superset:is_instance(Object) then
-			---@cast superset type-track.Object
-			if self.datatype ~= superset.datatype then return false end
+	function Object.is_subset(subset, superset)
+		if subset.datatype ~= superset.datatype then return false end
 
-			for op, super_impl in pairs(superset.ops) do
-				local impl = self.ops[op]
-				if not impl or not impl:is_subset(super_impl) then
-					return false
-				end
+		for op, super_impl in pairs(superset.ops) do
+			local impl = subset.ops[op]
+			if not impl or not impl:is_subset(super_impl) then
+				return false
 			end
-
-			return true
-		elseif superset:is_instance(Union) then
-			---@cast superset type-track.Union
-			return any_types(self, superset.types)
-		elseif superset:is_instance(Intersection) then
-			---@cast superset type-track.Intersection
-			return all_types(self, superset.types)
-		elseif superset:is_instance(Tuple) then
-			---@cast superset type-track.Tuple
-			local super_first = superset:at(1)
-			return super_first and self:is_subset(super_first) or false
-		elseif superset:is_instance(Callable) then
-			---@cast superset type-track.Callable
-			local call_impl = self.ops.call
-			return call_impl and call_impl:is_subset(superset) or false
 		end
 
-		return false
+		return true
 	end
 
 	---@param params? type-track.Type
@@ -482,15 +539,17 @@ do -- Union
 	---@param self type-track.Union
 	---@param types type-track.Type[]
 	function Union:new(types)
+		assert(#types >= 2, "unions must have at least two items")
 		self.types = types
 		-- I'll worry about optimizing this later
 	end
 
-	---@param superset type-track.Type
+	---@param subset type-track.Union
+	---@param superset type-track.Union
 	---@return boolean
-	function Union:is_subset(superset)
-		for _, type in ipairs(self.types) do
-			if not type:is_subset(superset) then
+	function Union.is_subset(subset, superset)
+		for _, subtype in ipairs(subset.types) do
+			if not any_types(subtype, superset.types) then
 				return false
 			end
 		end
@@ -500,7 +559,7 @@ do -- Union
 
 	---@param params type-track.Type
 	---@return type-track.Type? returns
-	function Union:call(params)
+	function UnionInst:call(params)
 		---@type type-track.Type[]
 		local all_returns = {}
 
@@ -530,7 +589,7 @@ do -- Union
 	---@param i integer
 	---@param default type-track.Type
 	---@return type-track.Type?
-	function Union:at(i, default)
+	function UnionInst:at(i, default)
 		local all_indexes = {} ---@type type-track.Type[]
 
 		for j, type in ipairs(self.types) do
@@ -555,35 +614,50 @@ do -- Intersection
 	---@param self type-track.Union
 	---@param types type-track.Type[]
 	function Intersection:new(types)
+		assert(#types >= 2, "intersections must have at least two items")
 		self.types = types
 	end
 
-	function Intersection:is_subset(superset)
-		for _, type in ipairs(self.types) do
-			if type:is_subset(superset) then
-				return true
+	--[[
+	A: "A"
+	B: "B"
+	C: "C"
+	AB: A & B
+	ABC: A & B & C
+
+	-- superset = subset
+	AB = ABC -- good, compare(ABC, AB) passes
+	ABC = AB -- bad, compare(AB, ABC) fails
+	]]
+	---@param subset type-track.Intersection
+	---@param superset type-track.Intersection
+	---@return boolean
+	function Intersection.is_subset(subset, superset)
+		for _, supertype in ipairs(superset.types) do
+			if not any_types(supertype, subset.types) then
+				return false
 			end
 		end
 
-		return false
+		return true
 	end
 
-	function Intersection:call(params)
+	function IntersectionInst:call(params)
 		error("not implemented")
 	end
 
-	function Intersection:at(i)
+	function IntersectionInst:at(i)
 		error("not implemented")
 	end
 end
 
 do -- Literal
-	---@class type-track.Literal : type-track.Type
+	---@class type-track.Literal : type-track.Object
 	---@field value unknown
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator div(type-track.Type): type-track.Callable
 	---@operator add(type-track.Type): type-track.Union
-	local LiteralInst = muun("Literal", Type)
+	local LiteralInst = muun("Literal", Object)
 
 	Literal = LiteralInst --[[@as type-track.Literal.Class]]
 
@@ -592,23 +666,15 @@ do -- Literal
 	---@param ops? type-track.Object.ops
 	---@param datatype? string
 	function Literal:new(value, ops, datatype)
+		Literal.__super(self, ops, datatype)
 		self.value = value
-		self.ops = ops
-		self.datatype = datatype
 	end
 
-	---@param superset type-track.Type
-	function LiteralInst:is_subset(superset)
-		if superset:is_instance(Literal) then
-			---@cast superset type-track.Literal
-			return self.value == superset.value
-		end
-
-		return Object.is_subset(self, superset)
-	end
-
-	function LiteralInst:call(params, op)
-		return Object.call(self, params, op)
+	---@param subset type-track.Literal
+	---@param superset type-track.Literal
+	---@return boolean
+	function Literal.is_subset(subset, superset)
+		return subset.value == superset.value
 	end
 end
 
@@ -621,4 +687,6 @@ return {
 	Literal = Literal,
 
 	Type = Type,
+
+	is_subset = is_subset,
 }

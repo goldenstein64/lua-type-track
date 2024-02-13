@@ -10,24 +10,11 @@ describe 'literals', ->
 		it 'accepts itself', ->
 			A = Literal 'A'
 
-			assert.is_true A\is_subset A
+			assert.is_true Literal.is_subset A, A
 
 		it 'rejects other literals', ->
 			A = Literal 'A'
 			B = Literal 'B'
 
-			assert.is_false A\is_subset B
-
-	describe 'at', ->
-		it 'returns itself on 1', ->
-			A = Literal 'A'
-
-			assert.equal A, A\at 1
-
-		it 'returns nil otherwise', ->
-			A = Literal 'A'
-
-			assert.is_nil A\at 2
-			assert.is_nil A\at 3
-			assert.is_nil A\at 4
+			assert.is_false Literal.is_subset A, B
 

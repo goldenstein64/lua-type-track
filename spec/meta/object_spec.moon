@@ -18,28 +18,23 @@ describe 'object', ->
 			obj1 = Object {}, 'string'
 			obj2 = Object {}, 'number'
 
-			assert.is_false obj1\is_subset obj2
-			assert.is_false obj2\is_subset obj1
+			assert.is_false Object.is_subset obj1, obj2
+			assert.is_false Object.is_subset obj2, obj1
 
 		it 'rejects objects without an operation', ->
 			obj1 = Object { index: A / B, newindex: AB / C }
 
 			obj2 = Object { index: A / B }
 
-			assert.is_true obj1\is_subset obj2
-			assert.is_false obj2\is_subset obj1
+			assert.is_true Object.is_subset obj1, obj2
+			assert.is_false Object.is_subset obj2, obj1
 
 		it 'rejects objects with an incompatible operation', ->
 			obj1 = Object { index: A / C }
 			obj2 = Object { index: B / C }
 
-			assert.is_false obj1\is_subset obj2
-			assert.is_false obj2\is_subset obj1
-
-		it 'rejects Literals', ->
-			obj = Object!
-
-			assert.is_false obj\is_subset A
+			assert.is_false Object.is_subset obj1, obj2
+			assert.is_false Object.is_subset obj2, obj1
 
 	describe 'call', ->
 		it 'returns nil if the call operation is not supported', ->
@@ -53,6 +48,6 @@ describe 'object', ->
 			assert.equal B, obj\call A
 
 		it 'supports additional operations with a second argument', ->
-			obj = Object { index: A / B }
+			obj = Object { foo: A / B }
 
-			assert.equal B, obj\call A, 'index'
+			assert.equal B, obj\call A, 'foo'
