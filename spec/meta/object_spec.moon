@@ -29,6 +29,18 @@ describe 'object', ->
 			assert.is_true obj1\is_subset obj2
 			assert.is_false obj2\is_subset obj1
 
+		it 'rejects objects with an incompatible operation', ->
+			obj1 = Object { index: A / C }
+			obj2 = Object { index: B / C }
+
+			assert.is_false obj1\is_subset obj2
+			assert.is_false obj2\is_subset obj1
+
+		it 'rejects Literals', ->
+			obj = Object!
+
+			assert.is_false obj\is_subset A
+
 	describe 'call', ->
 		it 'returns nil if the call operation is not supported', ->
 			obj = Object!

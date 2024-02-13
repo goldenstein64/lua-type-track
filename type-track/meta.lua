@@ -30,6 +30,7 @@ local Callable
 
 ---describes how operations work
 ---@class type-track.Object.Class
+---@field __base any
 ---@overload fun(ops?: type-track.Object.ops, datatype?: string): type-track.Object
 local Object
 
@@ -45,7 +46,6 @@ local Intersection
 
 ---a type that contains exactly one value
 ---@class type-track.Literal.Class
----@field __super type-track.Object | fun(self: type-track.Object, ops?: type-track.Object.ops, datatype?: string)
 ---@overload fun(value: unknown, ops?: type-track.Object.ops, datatype?: string): type-track.Literal
 local Literal
 
@@ -578,12 +578,12 @@ do -- Intersection
 end
 
 do -- Literal
-	---@class type-track.Literal : type-track.Object
+	---@class type-track.Literal : type-track.Type
 	---@field value unknown
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator div(type-track.Type): type-track.Callable
 	---@operator add(type-track.Type): type-track.Union
-	local LiteralInst = muun("Literal", Object)
+	local LiteralInst = muun("Literal", Type)
 
 	Literal = LiteralInst --[[@as type-track.Literal.Class]]
 
@@ -592,8 +592,9 @@ do -- Literal
 	---@param ops? type-track.Object.ops
 	---@param datatype? string
 	function Literal:new(value, ops, datatype)
-		Literal.__super(self, ops, datatype)
 		self.value = value
+		self.ops = ops
+		self.datatype = datatype
 	end
 
 	---@param superset type-track.Type
@@ -603,7 +604,11 @@ do -- Literal
 			return self.value == superset.value
 		end
 
-		return Literal.__super.is_subset(self, superset)
+		return Object.is_subset(self, superset)
+	end
+
+	function LiteralInst:call(params, op)
+		return Object.call(self, params, op)
 	end
 end
 
