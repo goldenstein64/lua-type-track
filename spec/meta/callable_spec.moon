@@ -52,4 +52,6 @@ describe 'callable', ->
 		it 'gives nil when given an incompatible param type', ->
 			func = Callable AB, ABC
 
+			assert.is_nil func\call never
+			assert.is_nil func\call A
 			assert.is_nil func\call Tuple { A }
