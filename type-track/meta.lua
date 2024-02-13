@@ -86,12 +86,13 @@ local function is_subset(subset, superset)
 		return sub_cls.is_subset(subset, superset)
 	elseif super_cls == Tuple then
 		---@cast superset type-track.Tuple
-		if #superset.types == 0 then
+		local superset_len = #superset.types
+		if superset_len == 0 then
 			return not superset.var_arg or is_subset(subset, superset.var_arg)
-		elseif #superset.types == 1 then
+		elseif superset_len == 1 then
 			return is_subset(subset, superset.types[1])
 		elseif Tuple.default_var_arg then
-			for i = 2, #superset.types do
+			for i = 2, superset_len do
 				local super_elem = superset.types[i]
 				if not is_subset(Tuple.default_var_arg, super_elem) then
 					return false
