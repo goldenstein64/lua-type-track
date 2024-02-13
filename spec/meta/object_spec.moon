@@ -22,9 +22,9 @@ describe 'object', ->
 			assert.is_false obj2\is_subset obj1
 
 		it 'rejects objects without an operation', ->
-			obj1 = Object { index: A / BA, newindex: B / A }
+			obj1 = Object { index: A / B, newindex: AB / C }
 
-			obj2 = Object { index: A / BA }
+			obj2 = Object { index: A / B }
 
 			assert.is_true obj1\is_subset obj2
 			assert.is_false obj2\is_subset obj1
