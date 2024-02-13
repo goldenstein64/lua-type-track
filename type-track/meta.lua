@@ -64,10 +64,10 @@ local all_types
 
 ---determines whether `subtype` is a subset of `supertype`. This operation is
 ---available across all
----@param subtype type-track.Type
----@param supertype type-track.Type
+---@param subset type-track.Type
+---@param superset type-track.Type
 ---@return boolean
-local function is_subset(subtype, supertype)
+local function is_subset(subset, superset)
 	-- Tuple, Union, Intersection, Object, Callable, Literal
 	-- 36 combinations
 	-- sub-super
@@ -80,92 +80,92 @@ local function is_subset(subtype, supertype)
 
 	-- If both types have the same class, their respective compare method is
 	-- used. Otherwise, coerce the types to something else and compare that?
-	local sub_cls = subtype.__class
-	local super_cls = supertype.__class
+	local sub_cls = subset.__class
+	local super_cls = superset.__class
 	if sub_cls == super_cls then
-		return sub_cls.is_subset(subtype, supertype)
+		return sub_cls.is_subset(subset, superset)
 	elseif super_cls == Tuple then
-		---@cast supertype type-track.Tuple
-		if #supertype.types == 0 then
-			return not supertype.var_arg or is_subset(subtype, supertype.var_arg)
-		elseif #supertype.types == 1 then
-			return is_subset(subtype, supertype.types[1])
+		---@cast superset type-track.Tuple
+		if #superset.types == 0 then
+			return not superset.var_arg or is_subset(subset, superset.var_arg)
+		elseif #superset.types == 1 then
+			return is_subset(subset, superset.types[1])
 		elseif Tuple.default_var_arg then
-			for i = 2, #supertype.types do
-				local super_elem = supertype.types[i]
+			for i = 2, #superset.types do
+				local super_elem = superset.types[i]
 				if not is_subset(Tuple.default_var_arg, super_elem) then
 					return false
 				end
 			end
 
-			return is_subset(subtype, supertype.types[1])
+			return is_subset(subset, superset.types[1])
 		end
 	elseif super_cls == Union then
-		---@cast supertype type-track.Union
-		return any_types(subtype, supertype.types)
+		---@cast superset type-track.Union
+		return any_types(subset, superset.types)
 	elseif super_cls == Intersection then
-		---@cast supertype type-track.Intersection
-		return all_types(subtype, supertype.types)
+		---@cast superset type-track.Intersection
+		return all_types(subset, superset.types)
 	elseif sub_cls == Tuple then
-		---@cast subtype type-track.Tuple
-		local first_elem = subtype:at(1)
+		---@cast subset type-track.Tuple
+		local first_elem = subset:at(1)
 		if first_elem then
-			return is_subset(first_elem, supertype)
+			return is_subset(first_elem, superset)
 		end
 	elseif sub_cls == Union then
-		---@cast subtype type-track.Union
-		for _, t in ipairs(subtype.types) do
-			if not is_subset(t, supertype) then
+		---@cast subset type-track.Union
+		for _, t in ipairs(subset.types) do
+			if not is_subset(t, superset) then
 				return false
 			end
 		end
 
 		return true
 	elseif sub_cls == Intersection then
-		---@cast subtype type-track.Intersection
-		for _, t in ipairs(subtype.types) do
-			if is_subset(t, supertype) then
+		---@cast subset type-track.Intersection
+		for _, t in ipairs(subset.types) do
+			if is_subset(t, superset) then
 				return true
 			end
 		end
 	elseif sub_cls == Literal then
-		---@cast subtype type-track.Literal
+		---@cast subset type-track.Literal
 		if super_cls == Object then
-			---@cast supertype type-track.Object
-			return Object.is_subset(subtype, supertype)
+			---@cast superset type-track.Object
+			return Object.is_subset(subset, superset)
 		elseif super_cls == Callable then
-			---@cast supertype type-track.Callable
-			local call_impl = subtype.ops.call
+			---@cast superset type-track.Callable
+			local call_impl = subset.ops.call
 			if call_impl then
-				return is_subset(call_impl, supertype)
+				return is_subset(call_impl, superset)
 			end
 		end
 	elseif sub_cls == Object then
-		---@cast subtype type-track.Object
+		---@cast subset type-track.Object
 		if super_cls == Callable then
-			---@cast supertype type-track.Callable
-			local call_impl = subtype.ops.call
+			---@cast superset type-track.Callable
+			local call_impl = subset.ops.call
 			if call_impl then
-				return is_subset(call_impl, supertype)
+				return is_subset(call_impl, superset)
 			end
 		end
 	elseif sub_cls == Callable then
-		---@cast subtype type-track.Callable
+		---@cast subset type-track.Callable
 		if super_cls == Object then
-			---@cast supertype type-track.Object
+			---@cast superset type-track.Object
 
 			-- a Callable is essentially an object with only a call operation
 			-- so if any of the supertype's operations aren't calls, it can't be a
 			-- subset
-			for op in pairs(supertype.ops) do
+			for op in pairs(superset.ops) do
 				if op ~= "call" then
 					return false
 				end
 			end
 
-			local call_impl = supertype.ops.call
+			local call_impl = superset.ops.call
 			if call_impl then
-				return is_subset(subtype, call_impl)
+				return is_subset(subset, call_impl)
 			else
 				-- if the supertype doesn't have a call op, it's just a symbol, but
 				-- Callables can be treated as symbols too.
