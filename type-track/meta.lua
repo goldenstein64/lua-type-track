@@ -527,7 +527,7 @@ do -- Object
 
 		for op, super_impl in pairs(superset.ops) do
 			local impl = subset.ops[op]
-			if not impl or not impl:is_subset(super_impl) then
+			if not impl or not is_subset(impl, super_impl) then
 				return false
 			end
 		end
@@ -563,6 +563,16 @@ do -- Union
 		-- I'll worry about optimizing this later
 	end
 
+	--[[
+	A: "A"
+	B: "B"
+	C: "C"
+	AB: A | B
+	ABC: A | B | C
+
+	ABC = AB -- good, is_subset(AB, ABC) passes
+	AB = ABC -- bad, is_subset(ABC, AB) fails
+	]]
 	---@param subset type-track.Union
 	---@param superset type-track.Union
 	---@return boolean
@@ -644,14 +654,31 @@ do -- Intersection
 	AB: A & B
 	ABC: A & B & C
 
+	xy1 = { x: number, y: number } === Object({
+		index: ('x') -> number
+			& ('y') -> number
+	})
+
+	xy2 = { x: number } & { y: number } === Object({
+		index: ('x') -> number
+	}) & Object({
+		index: ('y') -> number
+	})
+
+	-- these two interpretations should be equivalent!
+	is_subset(xy1, xy2) and is_subset(xy2, xy1)
+
 	-- superset = subset
-	AB = ABC -- good, compare(ABC, AB) passes
-	ABC = AB -- bad, compare(AB, ABC) fails
+	AB = ABC -- good, is_subset(ABC, AB) passes
+	ABC = AB -- bad, is_subset(AB, ABC) fails
 	]]
 	---@param subset type-track.Intersection
 	---@param superset type-track.Intersection
 	---@return boolean
 	function Intersection.is_subset(subset, superset)
+		if superset.types == nil then
+			print(debug.traceback())
+		end
 		for _, supertype in ipairs(superset.types) do
 			if not is_subset_of_any(supertype, subset.types) then
 				return false
