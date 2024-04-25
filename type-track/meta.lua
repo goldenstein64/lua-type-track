@@ -25,15 +25,9 @@ end
 local Tuple
 
 ---the base structural type
----@class type-track.Callable.Class
----@overload fun(params: type-track.Type, returns: type-track.Type): type-track.Callable
-local Callable
-
----describes how operations work
----@class type-track.Object.Class
----@field __base any
----@overload fun(ops?: type-track.Object.ops, datatype?: string): type-track.Object
-local Object
+---@class type-track.Operator.Class
+---@overload fun(params: type-track.Type, returns: type-track.Type): type-track.Operator
+local Operator
 
 ---an aggregation declaring at least one type lives in its value
 ---@class type-track.Union.Class
@@ -47,8 +41,7 @@ local Intersection
 
 ---a type that contains exactly one value
 ---@class type-track.Literal.Class
----@field __super type-track.Object | fun(self: type-track.Object, ops?: type-track.Object.ops, datatype?: string): type-track.Object
----@overload fun(value: unknown, ops?: type-track.Object.ops, datatype?: string): type-track.Literal
+---@overload fun(value: unknown, ops: type-track.Type): type-track.Literal
 local Literal
 
 ---@class type-track.Type.Class
@@ -62,30 +55,40 @@ local is_subset_of_any
 ---@type fun(actual: type-track.Type, list: type-track.Type[]): boolean
 local is_subset_of_all
 
+---@type fun(list: type-track.Type[], expected: type-track.Type): boolean
+local all_are_subset
+
+---@type fun(list: type-track.Type[], expected: type-track.Type): boolean
+local any_are_subset
+
 ---determines whether `subtype` is a subset of `supertype`. This operation is
 ---available across all
 ---@param subset type-track.Type
 ---@param superset type-track.Type
 ---@return boolean
 local function is_subset(subset, superset)
-	-- Tuple, Union, Intersection, Object, Callable, Literal
+	-- Tuple, Union, Intersection, Operator, Literal
 	-- 36 combinations
 	-- sub-super
-	-- TT TT TT TT TT TT
-	-- UT UU UI UO UC UL
-	-- IT IU II IO IC IL
-	-- OT OU OI OO OC OL
-	-- CT CU CI CO CC CL
-	-- LT LU LI LO LC LL
+	-- TT TU TI TO TL
+	-- UT UU UI UO UL
+	-- IT IU II IO IL
+	-- OT OU OI OO OL
+	-- LT LU LI LO LL
 
 	-- If both types have the same class, their respective compare method is
 	-- used. Otherwise, coerce the types to something else and compare that?
+
 	local sub_cls = subset.__class
 	local super_cls = superset.__class
 	if sub_cls == super_cls then
 		return sub_cls.is_subset(subset, superset)
-	elseif super_cls == Tuple then
+	end
+
+	-- supertype comparisons
+	if super_cls == Tuple then
 		---@cast superset type-track.Tuple
+		---@cast subset type-track.Operator | type-track.Intersection | type-track.Union | type-track.Literal
 		local superset_len = #superset.types
 		if superset_len == 0 then
 			return not superset.var_arg or is_subset(subset, superset.var_arg)
@@ -103,76 +106,36 @@ local function is_subset(subset, superset)
 		end
 	elseif super_cls == Union then
 		---@cast superset type-track.Union
+		---@cast subset type-track.Tuple | type-track.Intersection | type-track.Operator | type-track.Literal
 		return is_subset_of_any(subset, superset.types)
 	elseif super_cls == Intersection then
 		---@cast superset type-track.Intersection
+		---@cast subset type-track.Tuple | type-track.Union | type-track.Operator | type-track.Literal
 		return is_subset_of_all(subset, superset.types)
-	elseif sub_cls == Tuple then
+	end
+
+	-- subtype comparisons
+	if sub_cls == Tuple then
 		---@cast subset type-track.Tuple
-		local first_elem = subset:at(1)
-		if first_elem then
-			return is_subset(first_elem, superset)
-		end
+		---@cast superset type-track.Operator | type-track.Literal
+		return Tuple.is_subset(subset, Tuple({ superset }))
 	elseif sub_cls == Union then
 		---@cast subset type-track.Union
-		for _, t in ipairs(subset.types) do
-			if not is_subset(t, superset) then
-				return false
-			end
-		end
-
-		return true
+		---@cast superset type-track.Operator | type-track.Literal
+		-- the use cases for this are not significant either
+		return all_are_subset(subset.types, superset)
 	elseif sub_cls == Intersection then
 		---@cast subset type-track.Intersection
-		for _, t in ipairs(subset.types) do
-			if is_subset(t, superset) then
-				return true
-			end
-		end
+		---@cast superset type-track.Operator | type-track.Literal
+		return any_are_subset(subset.types, superset)
 	elseif sub_cls == Literal then
 		---@cast subset type-track.Literal
-		if super_cls == Object then
-			---@cast superset type-track.Object
-			return Object.is_subset(subset, superset)
-		elseif super_cls == Callable then
-			---@cast superset type-track.Callable
-			local call_impl = subset.ops.call
-			if call_impl then
-				return is_subset(call_impl, superset)
-			end
-		end
-	elseif sub_cls == Object then
-		---@cast subset type-track.Object
-		if super_cls == Callable then
-			---@cast superset type-track.Callable
-			local call_impl = subset.ops.call
-			if call_impl then
-				return is_subset(call_impl, superset)
-			end
-		end
-	elseif sub_cls == Callable then
-		---@cast subset type-track.Callable
-		if super_cls == Object then
-			---@cast superset type-track.Object
-
-			-- a Callable is essentially an object with only a call operation
-			-- so if any of the supertype's operations aren't calls, it can't be a
-			-- subset
-			for op in pairs(superset.ops) do
-				if op ~= "call" then
-					return false
-				end
-			end
-
-			local call_impl = superset.ops.call
-			if call_impl then
-				return is_subset(subset, call_impl)
-			else
-				-- if the supertype doesn't have a call op, it's just a symbol, but
-				-- Callables can be treated as symbols too.
-				return true
-			end
-		end
+		---@cast superset type-track.Operator
+		return is_subset(subset.ops, superset)
+	elseif sub_cls == Operator then
+		---@cast subset type-track.Operator
+		---@cast superset type-track.Literal
+		return false
 	end
 
 	return false
@@ -206,10 +169,36 @@ function is_subset_of_any(actual, list)
 	return false
 end
 
+---@param list type-track.Type[]
+---@param expected type-track.Type
+---@return boolean
+function all_are_subset(list, expected)
+	for _, actual in ipairs(list) do
+		if not is_subset(actual, expected) then
+			return false
+		end
+	end
+
+	return true
+end
+
+---@param list type-track.Type[]
+---@param expected type-track.Type
+---@return boolean
+function any_are_subset(list, expected)
+	for _, actual in ipairs(list) do
+		if is_subset(actual, expected) then
+			return true
+		end
+	end
+
+	return false
+end
+
 do -- Type
 	---@class type-track.Type : Inheritable
 	---@operator mul(type-track.Type): type-track.Intersection
-	---@operator div(type-track.Type): type-track.Callable
+	---@operator div(type-track.Type): type-track.Operator
 	---@operator add(type-track.Type): type-track.Union
 	local TypeInst = muun("Type", Inheritable)
 
@@ -219,17 +208,15 @@ do -- Type
 		return false
 	end
 
-	---attempts to call this type
-	---
-	---If `params` is a `Type`, it should be type-checked against. If it's `nil`,
-	---a generic return value should be given.
+	---attempts to evaluate an operation on this type
 	---
 	---If `nil` is returned, the call wasn't compatible. Otherwise, a return type
 	---is expected. Use a `Tuple` for multiple parameters or return types.
-	---@param params type-track.Type?
+	---@param op string
+	---@param params type-track.Type
 	---@return type-track.Type? returns
-	function TypeInst:call(params)
-		error(":call() is not implemented")
+	function TypeInst:eval(op, params)
+		error("not implemented")
 	end
 
 	---returns the `i`th element in this type
@@ -240,7 +227,14 @@ do -- Type
 	---@param i integer
 	---@return type-track.Type?
 	function TypeInst:at(i)
-		return i == 1 and self or nil
+		return i == 1 and self or Tuple.default_var_arg
+	end
+
+	---defines the algorithm for converting a type into its
+	---simplest form
+	---@return type-track.Type
+	function TypeInst:unify()
+		return self
 	end
 
 	---returns a union of its operands. This will concatenate unions when
@@ -249,7 +243,7 @@ do -- Type
 	---@return type-track.Union
 	function TypeInst:__add(other)
 		local values = {}
-		if self:is_instance(Union) then
+		if self.__class == Union then
 			---@cast self type-track.Union
 			for _, type in ipairs(self.types) do
 				table.insert(values, type)
@@ -258,7 +252,7 @@ do -- Type
 			table.insert(values, self)
 		end
 
-		if other:is_instance(Union) then
+		if other.__class == Union then
 			---@cast other type-track.Union
 			for _, type in ipairs(other.types) do
 				table.insert(values, type)
@@ -276,7 +270,7 @@ do -- Type
 	---@return type-track.Intersection
 	function TypeInst:__mul(other)
 		local values = {}
-		if self:is_instance(Intersection) then
+		if self.__class == Intersection then
 			---@cast self type-track.Intersection
 			for _, type in ipairs(self.types) do
 				table.insert(values, type)
@@ -285,7 +279,7 @@ do -- Type
 			table.insert(values, self)
 		end
 
-		if other:is_instance(Intersection) then
+		if other.__class == Intersection then
 			---@cast other type-track.Intersection
 			for _, type in ipairs(other.types) do
 				table.insert(values, type)
@@ -300,9 +294,31 @@ do -- Type
 	---returns a callable `(self) -> (other)`. An `__rsh` overload would look
 	---best, but LuaJIT doesn't support it.
 	---@param other type-track.Type
-	---@return type-track.Callable
+	---@return type-track.Operator
 	function TypeInst:__div(other)
-		return Callable(self, other)
+		return Operator(self, other)
+	end
+
+	---@param visited { [type-track.Type]: number?, n: number }
+	---@return string
+	function TypeInst:sub_visited(visited)
+		local visit_id = visited[self]
+		if visit_id then
+			return string.format("<%d>", visit_id)
+		else
+			visited.n = visited.n + 1
+			visit_id = visited.n
+			visited[self] = visit_id
+			return string.format("<%d>%s", visit_id, self:__tostring(visited))
+		end
+	end
+
+	---every type is serializable. The expectation is, if a type serializes to
+	---the same string as another type, they are the same type.
+	---@param visited { [type-track.Type]: number?, n: number }?
+	---@return string
+	function TypeInst:__tostring(visited)
+		error("__tostring metamethod is not implemented on this type")
 	end
 
 	function Type:__inherited(cls)
@@ -321,7 +337,7 @@ do -- Tuple
 	---@field types type-track.Type[]
 	---@field var_arg type-track.Type?
 	---@operator mul(type-track.Type): type-track.Intersection
-	---@operator div(type-track.Type): type-track.Callable
+	---@operator div(type-track.Type): type-track.Operator
 	---@operator add(type-track.Type): type-track.Union
 	local TupleInst = muun("Tuple", Type)
 
@@ -332,7 +348,7 @@ do -- Tuple
 	---@param var_arg? type-track.Type
 	function Tuple:new(types, var_arg)
 		self.types = types
-		self.var_arg = var_arg
+		self.var_arg = var_arg or Tuple.default_var_arg
 	end
 
 	--- compares two tuples
@@ -357,16 +373,12 @@ do -- Tuple
 		end
 
 		-- calling a function with less arguments than required is illegal
-		if not sub_var_arg and super_var_arg
-			and #subset.types > #superset.types
-		then
+		if not sub_var_arg and super_var_arg and #subset.types > #superset.types then
 			return false
 		end
 
 		-- calling a function with mismatching var-args is illegal
-		if sub_var_arg and super_var_arg
-			and not is_subset(sub_var_arg, super_var_arg)
-		then
+		if sub_var_arg and super_var_arg and not is_subset(sub_var_arg, super_var_arg) then
 			return false
 		end
 
@@ -395,51 +407,77 @@ do -- Tuple
 	---@param i integer
 	---@return type-track.Type?
 	function TupleInst:at(i)
-		return self.types[i] or self.var_arg or Tuple.default_var_arg
+		return self.types[i] or self.var_arg
 	end
 
-	---@param params? type-track.Type
+	---@param op string
+	---@param params type-track.Type
 	---@return type-track.Type? returns
-	function TupleInst:call(params)
-		return self:at(1):call(params)
+	function TupleInst:eval(op, params)
+		local first_elem = self:at(1)
+		if first_elem then
+			return first_elem:eval(op, params)
+		else
+			return nil
+		end
+	end
+
+	---@param visited { [type-track.Type]: number?, n: number }?
+	---@return string
+	function TupleInst:__tostring(visited)
+		visited = visited or { n = 0 }
+
+		local strings = {} ---@type string[]
+		for _, t in ipairs(self.types) do
+			table.insert(strings, t:sub_visited(visited))
+		end
+		return string.format("(%s)", table.concat(strings, ", "))
 	end
 end
 
-do -- Callable
-	---represents a value that can be called
-	---@class type-track.Callable : type-track.Type
+do -- Operator
+	---represents a possible operation on a value, e.g. addition, concatenation,
+	---etc.
+	---@class type-track.Operator : type-track.Type
 	---@field params type-track.Type
 	---@field returns type-track.Type
+	---@field op string
 	---@operator mul(type-track.Type): type-track.Intersection
-	---@operator div(type-track.Type): type-track.Callable
+	---@operator div(type-track.Type): type-track.Operator
 	---@operator add(type-track.Type): type-track.Union
-	local CallableInst = muun("Callable", Type)
+	local OperatorInst = muun("Operator", Type)
 
-	Callable = CallableInst --[[@as type-track.Callable.Class]]
+	Operator = OperatorInst --[[@as type-track.Operator.Class]]
 
-	---@param self type-track.Callable
+	---@param self type-track.Operator
 	---@param params type-track.Type
 	---@param returns type-track.Type
-	function Callable:new(params, returns)
+	---@param op? string
+	function Operator:new(params, returns, op)
 		self.params = params
 		self.returns = returns
+		self.op = op or "call"
 	end
 
-	---@param subset type-track.Callable
-	---@param superset type-track.Callable
+	---@param subset type-track.Operator
+	---@param superset type-track.Operator
 	---@return boolean
-	function Callable.is_subset(subset, superset)
-		return is_subset(subset.params, superset.params)
+	function Operator.is_subset(subset, superset)
+		return subset.op == superset.op
+			and is_subset(subset.params, superset.params)
 			and is_subset(superset.returns, subset.returns)
 	end
 
-	---@param params? type-track.Type
+	---@param op string
+	---@param params type-track.Type
 	---@return type-track.Type? returns
-	function CallableInst:call(params)
-		if not params then return self.returns end
+	function OperatorInst:eval(op, params)
+		if op ~= self.op then
+			return nil
+		end
 
-		if not params:is_instance(Tuple) then
-			params = Tuple({params})
+		if params.__class ~= Tuple then
+			params = Tuple({ params })
 		end
 
 		if is_subset(params, self.params) then
@@ -448,100 +486,18 @@ do -- Callable
 			return nil
 		end
 	end
-end
 
-do -- Object
-	---represents a value that supports zero or more operations (including calls)
-	---@class type-track.Object : type-track.Type
-	---@field ops type-track.Object.ops
-	---@field datatype? string
-	---@operator mul(type-track.Type): type-track.Intersection
-	---@operator div(type-track.Type): type-track.Callable
-	---@operator add(type-track.Type): type-track.Union
-	local ObjectInst = muun("Object", Type)
+	---@param visited { [type-track.Type]: number?, n: number }
+	---@return string
+	function OperatorInst:__tostring(visited)
+		visited = visited or { n = 0 }
 
-	Object = ObjectInst --[[@as type-track.Object.Class]]
-
-	---represents every operation permitted on a type.
-	---@alias type-track.op
-	---| "'add'" # `+`
-	---| "'sub'" # `-`
-	---| "'mul'" # `*`
-	---| "'div'" # `/`
-	---| "'idiv'" # `//`
-	---| "'mod'" # `%`
-	---| "'pow'" # `^`
-	---| "'unm'" # `-` (unary)
-	---| "'shl'" # `<<`
-	---| "'shr'" # `>>`
-	---| "'band'" # `&`
-	---| "'bor'" # `|`
-	---| "'bxor'" # `~` (binary)
-	---| "'bnot'" # `~` (unary)
-	---| "'concat'" # `..`
-	---| "'len'" # `#`
-	---| "'eq'" # `==`
-	---| "'lt'" # `<`
-	---| "'le'" # `<=`
-	---| "'index'" # `. or []`
-	---| "'newindex'" # `.= or []=`
-	---| "'call'" # `()`
-
-	---@class type-track.Object.ops
-	---@field add? type-track.Type
-	---@field sub? type-track.Type
-	---@field mul? type-track.Type
-	---@field div? type-track.Type
-	---@field idiv? type-track.Type
-	---@field mod? type-track.Type
-	---@field pow? type-track.Type
-	---@field unm? type-track.Type
-	---@field shl? type-track.Type
-	---@field shr? type-track.Type
-	---@field band? type-track.Type
-	---@field bor? type-track.Type
-	---@field bxor? type-track.Type
-	---@field bnot? type-track.Type
-	---@field concat? type-track.Type
-	---@field len? type-track.Type
-	---@field eq? type-track.Type
-	---@field lt? type-track.Type
-	---@field le? type-track.Type
-	---@field index? type-track.Type
-	---@field newindex? type-track.Type
-	---@field call? type-track.Type
-
-	---@param self type-track.Object
-	---@param ops? type-track.Object.ops
-	---@param datatype? string
-	function Object:new(ops, datatype)
-		self.ops = ops or {}
-		self.datatype = datatype
-	end
-
-	---@param subset type-track.Object
-	---@param superset type-track.Object
-	---@return boolean
-	function Object.is_subset(subset, superset)
-		if subset.datatype ~= superset.datatype then return false end
-
-		for op, super_impl in pairs(superset.ops) do
-			local impl = subset.ops[op]
-			if not impl or not is_subset(impl, super_impl) then
-				return false
-			end
-		end
-
-		return true
-	end
-
-	---@param params? type-track.Type
-	---@param op? type-track.op
-	---@return type-track.Type? returns
-	function ObjectInst:call(params, op)
-		op = op or "call"
-		local call_interface = self.ops[op] --[[@as type-track.Type?]]
-		return call_interface and call_interface:call(params)
+		return string.format(
+			"{ %s: %s -> %s }",
+			self.op,
+			self.params:sub_visited(visited),
+			self.returns:sub_visited(visited)
+		)
 	end
 end
 
@@ -549,7 +505,7 @@ do -- Union
 	---@class type-track.Union : type-track.Type
 	---@field types type-track.Type[]
 	---@operator mul(type-track.Type): type-track.Intersection
-	---@operator div(type-track.Type): type-track.Callable
+	---@operator div(type-track.Type): type-track.Operator
 	---@operator add(type-track.Type): type-track.Union
 	local UnionInst = muun("Union", Type)
 
@@ -586,15 +542,16 @@ do -- Union
 		return true
 	end
 
+	---@param op string
 	---@param params type-track.Type
 	---@return type-track.Type? returns
-	function UnionInst:call(params)
+	function UnionInst:eval(op, params)
 		---@type type-track.Type[]
 		local all_returns = {}
 
-		-- if any call is unsupported, the entire union doesn't support it
+		-- if any operation is unsupported, the entire union doesn't support it
 		for _, type in ipairs(self.types) do
-			local returns = type:call(params)
+			local returns = type:eval(op, params)
 			if returns then
 				table.insert(all_returns, returns)
 			else
@@ -616,24 +573,44 @@ do -- Union
 	end
 
 	---@param i integer
-	---@param default type-track.Type
 	---@return type-track.Type?
-	function UnionInst:at(i, default)
+	function UnionInst:at(i)
 		local all_indexes = {} ---@type type-track.Type[]
 
-		for j, type in ipairs(self.types) do
-			all_indexes[j] = type:at(i) or default
+		for _, type in ipairs(self.types) do
+			local elem = type:at(i)
+			if elem ~= nil then
+				table.insert(all_indexes, elem)
+			end
 		end
 
-		return Union(all_indexes)
+		if #all_indexes == 0 then
+			-- basically return never
+			return Tuple({})
+		elseif #all_indexes == 1 then
+			return all_indexes[1]
+		else
+			return Union(all_indexes)
+		end
+	end
+
+	---@param visited { [type-track.Type]: number?, n: number }
+	function UnionInst:__tostring(visited)
+		local strings = {} ---@type string[]
+		for _, t in ipairs(self.types) do
+			table.insert(strings, t:sub_visited(visited))
+		end
+		table.sort(strings)
+		return string.format("[%s]", table.concat(strings, " | "))
 	end
 end
 
 do -- Intersection
 	---@class type-track.Intersection : type-track.Type
 	---@field types type-track.Type[]
+	---@field is_collected boolean
 	---@operator mul(type-track.Type): type-track.Intersection
-	---@operator div(type-track.Type): type-track.Callable
+	---@operator div(type-track.Type): type-track.Operator
 	---@operator add(type-track.Type): type-track.Union
 	local IntersectionInst = muun("Intersection", Type)
 
@@ -645,6 +622,7 @@ do -- Intersection
 	function Intersection:new(types)
 		assert(#types >= 2, "intersections must have at least two items")
 		self.types = types
+		self.is_collected = false
 	end
 
 	--[[
@@ -676,9 +654,6 @@ do -- Intersection
 	---@param superset type-track.Intersection
 	---@return boolean
 	function Intersection.is_subset(subset, superset)
-		if superset.types == nil then
-			print(debug.traceback())
-		end
 		for _, supertype in ipairs(superset.types) do
 			if not is_subset_of_any(supertype, subset.types) then
 				return false
@@ -688,32 +663,104 @@ do -- Intersection
 		return true
 	end
 
-	function IntersectionInst:call(params)
-		error("not implemented")
+	---@param op string
+	---@param params type-track.Type
+	---@return type-track.Type? returns
+	function IntersectionInst:eval(op, params)
+		---@type type-track.Type[]
+		local all_returns = {}
+
+		-- it's okay if some calls are not supported here
+		for _, type in ipairs(self.types) do
+			local returns = type:eval(op, params)
+			if returns then
+				table.insert(all_returns)
+			end
+		end
+
+		if #all_returns == 0 then
+			-- all_returns may be empty
+			return nil
+		elseif #all_returns == 1 then
+			-- if we get here, at least one call succeeded
+			-- if only one call succeeded, return just that
+			return all_returns[1]
+		else
+			-- if we get here, at least two calls succeeded
+			-- I suppose just return an intersection of the returns
+			return Intersection(all_returns)
+		end
 	end
 
 	function IntersectionInst:at(i)
-		error("not implemented")
+		local all_indexes = {} ---@type type-track.Type[]
+
+		for _, type in ipairs(self.types) do
+			local elem = type:at(i)
+			if elem then
+				table.insert(all_indexes, elem)
+			end
+		end
+
+		if #all_indexes == 0 then
+			return Tuple({})
+		elseif #all_indexes == 1 then
+			return all_indexes[1]
+		else
+			return Intersection(all_indexes)
+		end
+	end
+
+	-- (A | B) & (A | C) == A | (B & C)
+	---@param collected_types type-track.Type[]?
+	---@return type-track.Intersection
+	function IntersectionInst:unify(collected_types)
+		if self.is_collected then
+			return self
+		end
+
+		collected_types = collected_types or {}
+		for _, type in ipairs(self.types) do
+			if type.__class == Intersection then
+				---@cast type type-track.Intersection
+				type:unify(collected_types)
+			else
+				table.insert(collected_types, type)
+			end
+		end
+
+		local result = Intersection(collected_types)
+		result.is_collected = true
+		return result
+	end
+
+	function IntersectionInst:__tostring(visited)
+		local strings = {}
+		for _, t in ipairs(self.types) do
+			table.insert(strings, tostring(t))
+		end
+		table.sort(strings)
+		return string.format("[%s]", table.concat(strings, " & "))
 	end
 end
 
 do -- Literal
-	---@class type-track.Literal : type-track.Object
+	---@class type-track.Literal : type-track.Type
 	---@field value unknown
+	---@field ops type-track.Type?
 	---@operator mul(type-track.Type): type-track.Intersection
-	---@operator div(type-track.Type): type-track.Callable
+	---@operator div(type-track.Type): type-track.Operator
 	---@operator add(type-track.Type): type-track.Union
-	local LiteralInst = muun("Literal", Object)
+	local LiteralInst = muun("Literal", Type)
 
 	Literal = LiteralInst --[[@as type-track.Literal.Class]]
 
 	---@param self type-track.Literal
 	---@param value unknown
-	---@param ops? type-track.Object.ops
-	---@param datatype? string
-	function Literal:new(value, ops, datatype)
-		Literal.__super(self, ops, datatype)
+	---@param ops? type-track.Type
+	function Literal:new(value, ops)
 		self.value = value
+		self.ops = ops
 	end
 
 	---@param subset type-track.Literal
@@ -722,12 +769,15 @@ do -- Literal
 	function Literal.is_subset(subset, superset)
 		return subset.value == superset.value
 	end
+
+	function LiteralInst:__tostring()
+		return string.format('"%s: %s"', tostring(self.value), tostring(self.ops))
+	end
 end
 
 return {
 	Tuple = Tuple,
-	Callable = Callable,
-	Object = Object,
+	Operator = Operator,
 	Union = Union,
 	Intersection = Intersection,
 	Literal = Literal,

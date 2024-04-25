@@ -1,11 +1,10 @@
 import
-	Type, Tuple, Union, Intersection, Object, Callable, Literal
+	Type, Tuple, Union, Intersection, Operator, Literal
 	is_subset
 from require 'type-track.meta'
 
 describe 'is_subset', ->
 	setup -> Tuple.default_var_arg = nil
-	teardown -> Tuple.default_var_arg = nil
 
 	A = Literal 'A'
 	B = Literal 'B'
@@ -24,6 +23,3 @@ describe 'is_subset', ->
 
 		it 'rejects the same type compared to two elements', ->
 			assert.is_false is_subset A, Tuple { A, A }
-
-	it 'rejects objects when compared up to literals', ->
-		assert.is_false is_subset Object!, Literal 'A'
