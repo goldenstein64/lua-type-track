@@ -1,75 +1,12 @@
 local meta_types = require("type-track.meta")
 
-local Tuple, Operator, Union, Intersection, Literal =
-	meta_types.Tuple, meta_types.Operator, meta_types.Union, meta_types.Intersection, meta_types.Literal
-
-local LazyRef = meta_types.LazyRef
-
-local T = Tuple
-local never = T({})
-
-local unknown = LazyRef()
-local number = LazyRef()
-local _string = LazyRef()
-local _table = LazyRef()
-local _function = LazyRef()
-local stringlib = LazyRef()
-
-local string_or_num = _string + number
-local concat_call = Operator("concat", string_or_num, _string)
-local unknown_var = T({}, unknown)
-
-local boolean_str = Literal("boolean", _string)
-local function_type = Operator("type", never, Literal("function", _string))
-
-local boolean = Operator("type", never, boolean_str)
-local _false = LazyRef()
-
-local _true = Literal(true, boolean)
-_false.value = Literal(
-	false,
-	Intersection({
-		boolean,
-		Operator("truthy", never, _false),
-	})
-)
-
-local _nil = Intersection({
-	Operator("type", never, Literal("nil", _string)),
-	Operator("truthy", never, _false),
-})
-
-_string.value = Intersection({
-	Operator("type", never, Literal("string", _string)),
-	concat_call,
-	stringlib,
-})
-
-number.value = Intersection({
-	Operator("type", never, Literal("number", _string)),
-	Operator("add", number, number),
-	Operator("sub", number, number),
-	Operator("mul", number, number),
-	Operator("div", number, number),
-	Operator("mod", number, number),
-	Operator("pow", number, number),
-	concat_call,
-})
-
-_table.value = Intersection({
-	Operator("type", never, Literal("table", _string)),
-	Operator("index", unknown, unknown),
-	Operator("newindex", T({ unknown, unknown }), never),
-	Operator("len", never, number),
-})
-
-_function.value = Intersection({
-	function_type,
-	Operator("call", unknown_var, unknown_var),
-})
-
-local thread = Operator("type", never, Literal("thread", _string))
-local userdata = Operator("type", never, Literal("userdata", _string))
+local Tuple, Operator, Union, Intersection, Literal, LazyRef =
+	meta_types.Tuple,
+	meta_types.Operator,
+	meta_types.Union,
+	meta_types.Intersection,
+	meta_types.Literal,
+	meta_types.LazyRef
 
 ---@generic F
 ---@param f F
@@ -87,6 +24,13 @@ local function memoize(f)
 	end
 end
 
+local T = Tuple
+local never = T({})
+
+local number = LazyRef()
+local _string = LazyRef()
+local stringlib = LazyRef()
+
 ---@param value string
 ---@return type-track.Literal
 local function string_of(value)
@@ -94,14 +38,53 @@ local function string_of(value)
 end
 string_of = memoize(string_of)
 
+local thread = Operator("type", never, string_of("thread"))
+local userdata = Operator("type", never, string_of("userdata"))
+
+local string_or_num = _string + number
+local concat_call = Operator("concat", string_or_num, _string)
+
+-- `unknown` is the top type of this system
+-- there's not really a good way to define this type semantically, other than
+-- hard-coding it into `is_subset` or smth
+local unknown = LazyRef()
+local unknown_var = T({}, unknown)
+
+local function_type = Operator("type", never, string_of("function"))
+local _function = function_type * Operator("call", unknown_var, unknown_var)
+
+local boolean = Operator("type", never, string_of("boolean"))
+local _false = LazyRef()
+
+local _true = Literal(true, boolean)
+_false.value = Literal(false, boolean * Operator("truthy", never, _false))
+
+local _nil = Operator("type", never, string_of("nil"))
+	* Operator("truthy", never, _false)
+
+_string.value = Operator("type", never, string_of("string"))
+	* concat_call
+	* stringlib
+
+number.value = Operator("type", never, string_of("number"))
+	* Operator("add", number, number)
+	* Operator("sub", number, number)
+	* Operator("mul", number, number)
+	* Operator("div", number, number)
+	* Operator("mod", number, number)
+	* Operator("pow", number, number)
+	* concat_call
+
+local _table = Operator("type", never, string_of("table"))
+	* Operator("index", unknown, unknown)
+	* Operator("newindex", T({ unknown, unknown }), never)
+	* Operator("len", never, number)
+
 ---@param params type-track.Type
 ---@param returns type-track.Type
 ---@return type-track.Type func
 local function func(params, returns)
-	return Intersection({
-		function_type,
-		Operator("call", params, returns),
-	})
+	return function_type * Operator("call", params, returns)
 end
 
 local num2_to_num = func(T({ number, number }), number)
@@ -112,21 +95,20 @@ local string_or_num_var = T({}, string_or_num)
 
 ---@param t type-track.Type
 local function array_of(t)
-	return Intersection({
-		Operator("index", number, t),
-		Operator("newindex", T({ number, t }), never),
-	})
+	return Operator("index", number, t)
+		* Operator("newindex", T({ number, t }), never)
 end
 
 ---@param tab { [string]: type-track.Type }
 ---@return type-track.Type
 local function lib(tab)
-	local entries = { Operator("newindex", T({ unknown, unknown }), never) }
+	---@type type-track.Type
+	local result = Operator("newindex", T({ unknown, unknown }), never)
 	for k, v in pairs(tab) do
-		table.insert(entries, Operator("index", string_of(k), v))
+		result = result * Operator("index", string_of(k), v)
 	end
 
-	return Intersection(entries)
+	return result
 end
 
 local string_or_num_or_nil = _string + number + _nil
@@ -141,7 +123,10 @@ stringlib.value = lib({
 		(_nil + T({ number, number }, string_or_num))
 	),
 	format = func(T({ string_or_num }, unknown), _string),
-	gmatch = func(T({ string_or_num, string_or_num }), func(never, string_or_num_var)),
+	gmatch = func(
+		T({ string_or_num, string_or_num }),
+		func(never, string_or_num_var)
+	),
 	gsub = func(
 		T({
 			string_or_num,
@@ -153,7 +138,10 @@ stringlib.value = lib({
 	),
 	len = func(string_or_num, number),
 	lower = func(string_or_num, _string),
-	match = func(T({ string_or_num, string_or_num, num_or_nil }), T({}, string_or_num_or_nil)),
+	match = func(
+		T({ string_or_num, string_or_num, num_or_nil }),
+		T({}, string_or_num_or_nil)
+	),
 	rep = func(T({ string_or_num, number }), _string),
 	reverse = func(string_or_num, _string),
 	sub = func(T({ string_or_num, number, num_or_nil }), _string),
@@ -161,11 +149,13 @@ stringlib.value = lib({
 })
 
 local tablelib = lib({
-	concat = func(T({ array_of(_string), string_or_num_or_nil, num_or_nil, num_or_nil }), _string),
-	insert = Intersection({
-		func(T({ _table, unknown }), never),
-		func(T({ _table, number, unknown }), never),
-	}),
+	concat = func(
+		T({ array_of(_string), string_or_num_or_nil, num_or_nil, num_or_nil }),
+		_string
+	),
+	insert = func(T({ _table, unknown }), never)
+		* func(T({ _table, number, unknown }), never),
+
 	maxn = func(_table, number),
 	remove = func(T({ _table, num_or_nil }), unknown),
 	sort = func(T({ _table, _function }), never),
@@ -249,13 +239,15 @@ local file_seek_mode_or_nil = file_seek_mode + _nil
 local vbuf_mode = string_of("no") + string_of("full") + string_of("line")
 
 local implicit_file = func(never, file_or_fail) * func(file, true_or_fail)
-local open_file = func(T({ string_or_num, file_open_mode + _nil }), file_or_fail)
+local open_file =
+	func(T({ string_or_num, file_open_mode + _nil }), file_or_fail)
 
 local iolib = lib({
 	close = func(file, true_or_fail) * func(never, true_or_fail),
 	flush = func(never, true_or_fail),
 	input = implicit_file,
-	lines = func(never, func(never, _string)) * func(string_or_num, func(never, _string)),
+	lines = func(never, func(never, _string))
+		* func(string_or_num, func(never, _string)),
 	open = open_file,
 	output = implicit_file,
 	popen = open_file,
@@ -265,19 +257,24 @@ local iolib = lib({
 	write = func(string_or_num_var, file_or_fail),
 })
 
-file.value = Intersection({
-	userdata,
-	Operator("iolib.type", never, string_of("file") + string_of("closed file")),
-	lib({
+file.value = userdata
+	* Operator(
+		"iolib.type",
+		never,
+		string_of("file") + string_of("closed file")
+	)
+	* lib({
 		close = func(file, true_or_fail),
 		flush = func(file, true_or_fail),
 		lines = func(file, func(never, _string)),
 		read = func(T({ file }, file_read_mode), string_or_num_var),
-		seek = func(T({ file, file_seek_mode_or_nil, num_or_nil }), num_or_fail),
+		seek = func(
+			T({ file, file_seek_mode_or_nil, num_or_nil }),
+			num_or_fail
+		),
 		setvbuf = func(T({ file, vbuf_mode, num_or_nil }), true_or_fail),
 		write = func(T({ file }, string_or_num), file_or_fail),
-	}),
-})
+	})
 
 local osdate_table = lib({
 	year = number,
@@ -320,8 +317,10 @@ local string_or_nil = _string + _nil
 
 local oslib = lib({
 	clock = func(never, number),
-	date = func(T({ string_of("*t") + string_of("!*t"), num_or_nil }), osdate_table)
-		* func(T({ _string, num_or_nil }), _string),
+	date = func(
+		T({ string_of("*t") + string_of("!*t"), num_or_nil }),
+		osdate_table
+	) * func(T({ _string, num_or_nil }), _string),
 	difftime = num2_to_num,
 	execute = func(_nil, true_or_nil) * func(_string, os_result),
 	exit = func(string_or_num_or_nil, never),
@@ -333,7 +332,10 @@ local oslib = lib({
 	tmpname = func(never, _string),
 })
 
-local coroutine_status = string_of("running") + string_of("suspended") + string_of("normal") + string_of("dead")
+local coroutine_status = string_of("running")
+	+ string_of("suspended")
+	+ string_of("normal")
+	+ string_of("dead")
 
 -- coroutinelib
 local coroutinelib = lib({

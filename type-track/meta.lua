@@ -381,12 +381,20 @@ do -- Tuple
 		end
 
 		-- calling a function with less arguments than required is illegal
-		if not sub_var_arg and super_var_arg and #subset.types > #superset.types then
+		if
+			not sub_var_arg
+			and super_var_arg
+			and #subset.types > #superset.types
+		then
 			return false
 		end
 
 		-- calling a function with mismatching var-args is illegal
-		if sub_var_arg and super_var_arg and not is_subset(sub_var_arg, super_var_arg) then
+		if
+			sub_var_arg
+			and super_var_arg
+			and not is_subset(sub_var_arg, super_var_arg)
+		then
 			return false
 		end
 
@@ -784,7 +792,11 @@ do -- Literal
 	end
 
 	function LiteralInst:__tostring()
-		return string.format('"%s: %s"', tostring(self.value), tostring(self.ops))
+		return string.format(
+			'"%s: %s"',
+			tostring(self.value),
+			tostring(self.ops)
+		)
 	end
 end
 
