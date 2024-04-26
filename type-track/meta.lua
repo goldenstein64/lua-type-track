@@ -26,7 +26,7 @@ local Tuple
 
 ---the base structural type
 ---@class type-track.Operator.Class
----@overload fun(params: type-track.Type, returns: type-track.Type): type-track.Operator
+---@overload fun(op: string, params: type-track.Type, returns: type-track.Type): type-track.Operator
 local Operator
 
 ---an aggregation declaring at least one type lives in its value
@@ -48,6 +48,10 @@ local Literal
 ---@field __base any
 ---@overload fun(): type-track.Type
 local Type
+
+---@class type-track.LazyRef.Class
+---@overload fun(): type-track.LazyRef
+local LazyRef
 
 ---@type fun(actual: type-track.Type, list: type-track.Type[]): boolean
 local is_subset_of_any
@@ -78,6 +82,20 @@ local function is_subset(subset, superset)
 
 	-- If both types have the same class, their respective compare method is
 	-- used. Otherwise, coerce the types to something else and compare that?
+
+	---@diagnostic disable-next-line: undefined-field, need-check-nil
+	while subset.__class == LazyRef and subset.value do
+		---@cast subset type-track.LazyRef
+		subset = subset.value
+	end
+	---@cast subset type-track.Type
+
+	---@diagnostic disable-next-line: undefined-field, need-check-nil
+	while superset.__class == LazyRef and superset.value do
+		---@cast superset type-track.LazyRef
+		superset = superset.value
+	end
+	---@cast superset type-track.Type
 
 	local sub_cls = subset.__class
 	local super_cls = superset.__class
@@ -198,7 +216,6 @@ end
 do -- Type
 	---@class type-track.Type : Inheritable
 	---@operator mul(type-track.Type): type-track.Intersection
-	---@operator div(type-track.Type): type-track.Operator
 	---@operator add(type-track.Type): type-track.Union
 	local TypeInst = muun("Type", Inheritable)
 
@@ -291,14 +308,6 @@ do -- Type
 		return Intersection(values)
 	end
 
-	---returns a callable `(self) -> (other)`. An `__rsh` overload would look
-	---best, but LuaJIT doesn't support it.
-	---@param other type-track.Type
-	---@return type-track.Operator
-	function TypeInst:__div(other)
-		return Operator(self, other)
-	end
-
 	---@param visited { [type-track.Type]: number?, n: number }
 	---@return string
 	function TypeInst:sub_visited(visited)
@@ -337,7 +346,6 @@ do -- Tuple
 	---@field types type-track.Type[]
 	---@field var_arg type-track.Type?
 	---@operator mul(type-track.Type): type-track.Intersection
-	---@operator div(type-track.Type): type-track.Operator
 	---@operator add(type-track.Type): type-track.Union
 	local TupleInst = muun("Tuple", Type)
 
@@ -443,20 +451,19 @@ do -- Operator
 	---@field returns type-track.Type
 	---@field op string
 	---@operator mul(type-track.Type): type-track.Intersection
-	---@operator div(type-track.Type): type-track.Operator
 	---@operator add(type-track.Type): type-track.Union
 	local OperatorInst = muun("Operator", Type)
 
 	Operator = OperatorInst --[[@as type-track.Operator.Class]]
 
 	---@param self type-track.Operator
+	---@param op string
 	---@param params type-track.Type
 	---@param returns type-track.Type
-	---@param op? string
-	function Operator:new(params, returns, op)
+	function Operator:new(op, params, returns)
 		self.params = params
 		self.returns = returns
-		self.op = op or "call"
+		self.op = op
 	end
 
 	---@param subset type-track.Operator
@@ -505,7 +512,6 @@ do -- Union
 	---@class type-track.Union : type-track.Type
 	---@field types type-track.Type[]
 	---@operator mul(type-track.Type): type-track.Intersection
-	---@operator div(type-track.Type): type-track.Operator
 	---@operator add(type-track.Type): type-track.Union
 	local UnionInst = muun("Union", Type)
 
@@ -610,14 +616,13 @@ do -- Intersection
 	---@field types type-track.Type[]
 	---@field is_collected boolean
 	---@operator mul(type-track.Type): type-track.Intersection
-	---@operator div(type-track.Type): type-track.Operator
 	---@operator add(type-track.Type): type-track.Union
 	local IntersectionInst = muun("Intersection", Type)
 
 	---@class type-track.Intersection.Class
 	Intersection = IntersectionInst --[[@as type-track.Intersection.Class]]
 
-	---@param self type-track.Union
+	---@param self type-track.Intersection
 	---@param types type-track.Type[]
 	function Intersection:new(types)
 		assert(#types >= 2, "intersections must have at least two items")
@@ -692,6 +697,8 @@ do -- Intersection
 		end
 	end
 
+	---@param i integer
+	---@return type-track.Type?
 	function IntersectionInst:at(i)
 		local all_indexes = {} ---@type type-track.Type[]
 
@@ -749,7 +756,6 @@ do -- Literal
 	---@field value unknown
 	---@field ops type-track.Type?
 	---@operator mul(type-track.Type): type-track.Intersection
-	---@operator div(type-track.Type): type-track.Operator
 	---@operator add(type-track.Type): type-track.Union
 	local LiteralInst = muun("Literal", Type)
 
@@ -761,6 +767,13 @@ do -- Literal
 	function Literal:new(value, ops)
 		self.value = value
 		self.ops = ops
+	end
+
+	---@param op string
+	---@param params type-track.Type
+	---@return type-track.Type? returns
+	function Literal:eval(op, params)
+		return self.ops:eval(op, params)
 	end
 
 	---@param subset type-track.Literal
@@ -775,12 +788,43 @@ do -- Literal
 	end
 end
 
+do
+	---@class type-track.LazyRef : type-track.Type
+	---@field value type-track.Type?
+	---@operator mul(type-track.Type): type-track.Intersection
+	---@operator add(type-track.Type): type-track.Union
+	local LazyRefInst = muun("LazyRef", Type)
+
+	LazyRef = LazyRefInst --[[@as type-track.LazyRef.Class]]
+
+	---@param op string
+	---@param params type-track.Type
+	---@return type-track.Type? returns
+	function LazyRefInst:eval(op, params)
+		assert(self.value, "lazy reference used before definition")
+		return self.value:eval(op, params)
+	end
+
+	---@param i integer
+	---@return type-track.Type?
+	function LazyRefInst:at(i)
+		assert(self.value, "lazy reference used before definition")
+		return self.value:at(i)
+	end
+
+	function LazyRefInst:unify()
+		assert(self.value, "lazy reference used before definition")
+		return self.value:unify()
+	end
+end
+
 return {
 	Tuple = Tuple,
 	Operator = Operator,
 	Union = Union,
 	Intersection = Intersection,
 	Literal = Literal,
+	LazyRef = LazyRef,
 
 	Type = Type,
 
