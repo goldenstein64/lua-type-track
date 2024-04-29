@@ -826,6 +826,10 @@ do -- LazyRef
 	function LazyRefInst:unify(visited)
 		return self:unwrap():unify(visited)
 	end
+
+	function LazyRefInst:__tostring()
+		return self:unwrap():__tostring()
+	end
 end
 
 return {
