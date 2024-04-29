@@ -262,10 +262,10 @@ do -- Type
 		return false
 	end
 
-	---attempts to evaluate an operation on this type
+	---attempts to evaluate `op` on this type with `params`
 	---
-	---If `nil` is returned, the call wasn't compatible. Otherwise, a return type
-	---is expected. Use a `Tuple` for multiple parameters or return types.
+	---If `nil` is returned, the operation wasn't compatible. Otherwise, a type
+	---is returned. A `Tuple` is used for multiple return types.
 	---@param op string
 	---@param params type-track.Type
 	---@return type-track.Type? returns
