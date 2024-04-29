@@ -820,11 +820,11 @@ do -- LazyRef
 	function LazyRefInst:at(i)
 		return self:unwrap():at(i)
 	end
-	end
 
-	function LazyRefInst:unify()
-		assert(self.value, "lazy reference used before definition")
-		return self.value:unify()
+	---@param visited { [type-track.Type]: true? }
+	---@return type-track.Type
+	function LazyRefInst:unify(visited)
+		return self:unwrap():unify(visited)
 	end
 end
 
