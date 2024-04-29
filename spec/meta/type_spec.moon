@@ -22,11 +22,11 @@ describe 'type', ->
 
 			assert.is_false Type.is_subset type1, type2
 
-	describe 'default call', ->
+	describe 'default eval', ->
 		it 'errors', ->
 			type1 = Type!
 
-			assert.error -> type1\call!
+			assert.error -> type1\eval!
 
 	describe 'default at', ->
 		it 'returns itself on 1', ->

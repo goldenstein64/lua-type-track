@@ -563,6 +563,7 @@ end
 do -- Union
 	---@class type-track.Union : type-track.Type
 	---@field types type-track.Type[]
+	---@field is_unified boolean
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator add(type-track.Type): type-track.Union
 	local UnionInst = muun("Union", Type)
