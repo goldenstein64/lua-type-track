@@ -682,8 +682,7 @@ do -- Union
 		end
 
 		if #all_indexes == 0 then
-			-- basically return never
-			return Tuple({})
+			return nil
 		elseif #all_indexes == 1 then
 			return all_indexes[1]
 		else
@@ -777,7 +776,7 @@ do -- Intersection
 		end
 
 		if #all_indexes == 0 then
-			return Tuple({})
+			return nil
 		elseif #all_indexes == 1 then
 			return all_indexes[1]
 		else
