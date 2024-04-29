@@ -16,27 +16,36 @@ describe 'type', ->
 		assert.is_true intersection\is_instance Intersection
 
 	describe 'default is_subset', ->
+		it 'exists', ->
+			assert.not_nil Type.is_subset
+
 		it 'returns false', ->
 			type1 = Type!
-			type2 = Type!
-
-			assert.is_false Type.is_subset type1, type2
+			assert.is_false Type.is_subset type1, type1
 
 	describe 'default eval', ->
+		it 'exists', ->
+			type1 = Type!
+			assert.not_nil type1.eval
+
 		it 'errors', ->
 			type1 = Type!
 
 			assert.error -> type1\eval!
 
 	describe 'default at', ->
-		it 'returns itself on 1', ->
-			A = Literal 'A'
+		it 'exists', ->
+			type1 = Type!
+			assert.not_nil type1.at
 
-			assert.equal A, A\at 1
+		it 'returns itself on 1', ->
+			type2 = Type!
+
+			assert.equal type2, type2\at 1
 
 		it 'returns nil otherwise', ->
-			A = Literal 'A'
+			type3 = Type!
 
-			assert.is_nil A\at 2
-			assert.is_nil A\at 3
-			assert.is_nil A\at 4
+			assert.is_nil type3\at 2
+			assert.is_nil type3\at 3
+			assert.is_nil type3\at 4
