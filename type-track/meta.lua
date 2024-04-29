@@ -54,6 +54,7 @@ local Literal
 ---@overload fun(): type-track.Type
 local Type
 
+---allows separating a type's declaration from its definition
 ---@class type-track.LazyRef.Class
 ---@overload fun(): type-track.LazyRef
 local LazyRef
@@ -805,7 +806,7 @@ do -- Literal
 	end
 end
 
-do
+do -- LazyRef
 	---@class type-track.LazyRef : type-track.Type
 	---@field value type-track.Type?
 	---@operator mul(type-track.Type): type-track.Intersection
@@ -814,19 +815,24 @@ do
 
 	LazyRef = LazyRefInst --[[@as type-track.LazyRef.Class]]
 
+	---@return type-track.Type
+	function LazyRefInst:unwrap()
+		local value = assert(self.value, "attempt to use an empty LazyRef")
+		return value
+	end
+
 	---@param op string
 	---@param params type-track.Type
 	---@return type-track.Type? returns
 	function LazyRefInst:eval(op, params)
-		assert(self.value, "lazy reference used before definition")
-		return self.value:eval(op, params)
+		return self:unwrap():eval(op, params)
 	end
 
 	---@param i integer
 	---@return type-track.Type?
 	function LazyRefInst:at(i)
-		assert(self.value, "lazy reference used before definition")
-		return self.value:at(i)
+		return self:unwrap():at(i)
+	end
 	end
 
 	function LazyRefInst:unify()
