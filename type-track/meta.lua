@@ -168,9 +168,12 @@ end
 ---accepts a type `actual` if it is a subset of all types in `list`
 ---@param actual type-track.Type
 ---@param list type-track.Type[]
+---@param i? integer
+---@param j? integer
 ---@return boolean
-function is_subset_of_all(actual, list)
-	for _, expected in ipairs(list) do
+function is_subset_of_all(actual, list, i, j)
+	for k = i or 1, j or #list do
+		local expected = list[k]
 		if not is_subset(actual, expected) then
 			return false
 		end
@@ -182,9 +185,12 @@ end
 ---accepts a type `actual` if it is a subset of any type in `list`
 ---@param actual type-track.Type
 ---@param list type-track.Type[]
+---@param i? integer
+---@param j? integer
 ---@return boolean
-function is_subset_of_any(actual, list)
-	for _, expected in ipairs(list) do
+function is_subset_of_any(actual, list, i, j)
+	for k = i or 1, j or #list do
+		local expected = list[k]
 		if is_subset(actual, expected) then
 			return true
 		end
@@ -195,9 +201,12 @@ end
 
 ---@param list type-track.Type[]
 ---@param expected type-track.Type
+---@param i? integer
+---@param j? integer
 ---@return boolean
-function all_are_subset(list, expected)
-	for _, actual in ipairs(list) do
+function all_are_subset(list, expected, i, j)
+	for k = i or 1, j or #list do
+		local actual = list[k]
 		if not is_subset(actual, expected) then
 			return false
 		end
@@ -208,9 +217,12 @@ end
 
 ---@param list type-track.Type[]
 ---@param expected type-track.Type
+---@param i? integer
+---@param j? integer
 ---@return boolean
-function any_are_subset(list, expected)
-	for _, actual in ipairs(list) do
+function any_are_subset(list, expected, i, j)
+	for k = i or 1, j or #list do
+		local actual = list[k]
 		if is_subset(actual, expected) then
 			return true
 		end
