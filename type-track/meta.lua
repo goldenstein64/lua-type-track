@@ -870,11 +870,7 @@ do -- Literal
 	end
 
 	function LiteralInst:__tostring()
-		return string.format(
-			'"%s: %s"',
-			tostring(self.value),
-			tostring(self.ops)
-		)
+		return string.format('"%s: %s"', tostring(self.value), tostring(self.ops))
 	end
 end
 
