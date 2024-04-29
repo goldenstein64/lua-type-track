@@ -62,13 +62,13 @@ local LazyRef
 ---@type fun(actual: type-track.Type, list: type-track.Type[]): boolean
 local is_subset_of_any
 
----@type fun(actual: type-track.Type, list: type-track.Type[]): boolean
+---@type fun(actual: type-track.Type, list: type-track.Type[], i?: integer, j?: integer): boolean
 local is_subset_of_all
 
----@type fun(list: type-track.Type[], expected: type-track.Type): boolean
+---@type fun(list: type-track.Type[], expected: type-track.Type, i?: integer, j?: integer): boolean
 local all_are_subset
 
----@type fun(list: type-track.Type[], expected: type-track.Type): boolean
+---@type fun(list: type-track.Type[], expected: type-track.Type, i?: integer, j?: integer): boolean
 local any_are_subset
 
 ---determines whether `subtype` is a subset of `supertype`. This operation is
