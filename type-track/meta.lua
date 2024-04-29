@@ -70,7 +70,7 @@ local unknown_var
 ---@type type-track.Never
 local Never
 
----@type fun(actual: type-track.Type, list: type-track.Type[]): boolean
+---@type fun(actual: type-track.Type, list: type-track.Type[], i?: integer, j?: integer): boolean
 local is_subset_of_any
 
 ---@type fun(actual: type-track.Type, list: type-track.Type[], i?: integer, j?: integer): boolean
