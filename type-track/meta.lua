@@ -977,6 +977,8 @@ return {
 	Intersection = Intersection,
 	Literal = Literal,
 	LazyRef = LazyRef,
+	Never = Never,
+	Unknown = Unknown,
 
 	Type = Type,
 
