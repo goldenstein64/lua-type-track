@@ -644,31 +644,6 @@ do -- Intersection
 		self.is_collected = false
 	end
 
-	--[[
-	A: "A"
-	B: "B"
-	C: "C"
-	AB: A & B
-	ABC: A & B & C
-
-	xy1 = { x: number, y: number } === Object({
-		index: ('x') -> number
-			& ('y') -> number
-	})
-
-	xy2 = { x: number } & { y: number } === Object({
-		index: ('x') -> number
-	}) & Object({
-		index: ('y') -> number
-	})
-
-	-- these two interpretations should be equivalent!
-	is_subset(xy1, xy2) and is_subset(xy2, xy1)
-
-	-- superset = subset
-	AB = ABC -- good, is_subset(ABC, AB) passes
-	ABC = AB -- bad, is_subset(AB, ABC) fails
-	]]
 	---@param subset type-track.Intersection
 	---@param superset type-track.Intersection
 	---@return boolean
