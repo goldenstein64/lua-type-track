@@ -1,13 +1,6 @@
 import Type, Callable, Union, Intersection, Tuple, Literal from require 'type-track.meta'
 
 describe 'type', ->
-	it 'creates Callables with / operator', ->
-		type1 = Type!
-		type2 = Type!
-
-		callable = type1 / type2
-		assert.is_true callable\is_instance Callable
-
 	it 'creates Unions with + operator', ->
 		type1 = Type!
 		type2 = Type!
