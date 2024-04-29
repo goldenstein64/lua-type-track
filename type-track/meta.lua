@@ -285,9 +285,11 @@ do -- Type
 	end
 
 	---defines the algorithm for converting a type into its
-	---simplest form
+	---simplest form. It must always return a new Type.
+	---@param visited { [type-track.Type]: true? }
 	---@return type-track.Type
-	function TypeInst:unify()
+	function TypeInst:unify(visited)
+		visited[self] = true
 		return self
 	end
 
@@ -567,6 +569,7 @@ do -- Union
 	function Union:new(types)
 		assert(#types >= 2, "unions must have at least two items")
 		self.types = types
+		self.is_unified = false
 		-- I'll worry about optimizing this later
 	end
 
@@ -620,7 +623,50 @@ do -- Union
 			c = f() -- it could be a string or a number...
 		]]
 		-- I guess return a union of the return values
+		assert(#all_returns >= 2, "evaluation on union did not have enough types")
 		return Union(all_returns)
+	end
+
+	---@param visited { [type-track.Type]: true? }
+	---@return type-track.Type
+	function UnionInst:unify(visited)
+		if visited[self] then
+			return self
+		end
+		visited[self] = true
+
+		if self.is_unified then
+			return self
+		end
+
+		local flattened = {} ---@type type-track.Type[]
+		for _, type in ipairs(self.types) do
+			type = type:unify(visited)
+			if type == Unknown then
+				return Unknown
+			elseif type.__class == Union then
+				---@cast type type-track.Union
+				local types = type.types
+				table.move(types, 1, #types, #flattened + 1, flattened)
+			elseif not is_subset_of_any(type, flattened) then
+				for i = #flattened, 1, -1 do
+					local type2 = flattened[i]
+					if is_subset(type2, type) then
+						table.remove(flattened, i)
+					end
+				end
+				table.insert(flattened, type)
+			end
+		end
+
+		assert(#flattened > 0, "no types to unify?")
+		if #flattened == 1 then
+			return flattened[1]
+		else
+			local result = Union(flattened)
+			result.is_unified = true
+			return result
+		end
 	end
 
 	---@param i integer
@@ -659,7 +705,7 @@ end
 do -- Intersection
 	---@class type-track.Intersection : type-track.Type
 	---@field types type-track.Type[]
-	---@field is_collected boolean
+	---@field is_unified boolean
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator add(type-track.Type): type-track.Union
 	local IntersectionInst = muun("Intersection", Type)
@@ -672,7 +718,8 @@ do -- Intersection
 	function Intersection:new(types)
 		assert(#types >= 2, "intersections must have at least two items")
 		self.types = types
-		self.is_collected = false
+		self.is_unified = false
+		-- I'll worry about optimizing this later
 	end
 
 	---@param subset type-track.Intersection
@@ -739,26 +786,46 @@ do -- Intersection
 	end
 
 	-- (A | B) & (A | C) == A | (B & C)
-	---@param collected_types type-track.Type[]?
-	---@return type-track.Intersection
-	function IntersectionInst:unify(collected_types)
-		if self.is_collected then
+	---@param visited { [type-track.Type]: true? }
+	---@return type-track.Type
+	function IntersectionInst:unify(visited)
+		if visited[self] then
+			return self
+		end
+		visited[self] = true
+
+		if self.is_unified then
 			return self
 		end
 
-		collected_types = collected_types or {}
+		local flattened = {} ---@type type-track.Type[]
 		for _, type in ipairs(self.types) do
-			if type.__class == Intersection then
+			type = type:unify(visited)
+			if type == Never then
+				return Never
+			elseif type.__class == Intersection then
 				---@cast type type-track.Intersection
-				type:unify(collected_types)
-			else
-				table.insert(collected_types, type)
+				local types = type.types
+				table.move(types, 1, #types, #flattened + 1, flattened)
+			elseif not any_are_subset(flattened, type) then
+				for i = #flattened, 1, -1 do
+					local type2 = flattened[i]
+					if is_subset(type, type2) then
+						table.remove(flattened, i)
+					end
+				end
+				table.insert(flattened, type)
 			end
 		end
 
-		local result = Intersection(collected_types)
-		result.is_collected = true
-		return result
+		assert(#flattened > 0, "no types to unify?")
+		if #flattened == 1 then
+			return flattened[1]
+		else
+			local result = Intersection(flattened)
+			result.is_unified = true
+			return result
+		end
 	end
 
 	function IntersectionInst:__tostring(visited)
