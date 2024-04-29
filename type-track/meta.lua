@@ -59,6 +59,17 @@ local Type
 ---@overload fun(): type-track.LazyRef
 local LazyRef
 
+---the top type. It behaves like a union of all types.
+---@type type-track.Unknown
+local Unknown
+
+---@type type-track.Tuple
+local unknown_var
+
+---the bottom type. It behaves like an intersection of all types.
+---@type type-track.Never
+local Never
+
 ---@type fun(actual: type-track.Type, list: type-track.Type[]): boolean
 local is_subset_of_any
 
@@ -102,6 +113,14 @@ local function is_subset(subset, superset)
 		superset = superset.value
 	end
 	---@cast superset type-track.Type
+
+	if subset == Never or superset == Unknown then
+		return true
+	end
+
+	if subset == Unknown or superset == Never then
+		return false
+	end
 
 	local sub_cls = subset.__class
 	local super_cls = superset.__class
@@ -830,6 +849,59 @@ do -- LazyRef
 	function LazyRefInst:__tostring()
 		return self:unwrap():__tostring()
 	end
+end
+
+do -- Unknown
+	---@class type-track.Unknown.Class
+	---@overload fun(): type-track.Unknown
+	local UnknownClass = muun("Unknown", Type) --[[@as type-track.Unknown.Class]]
+
+	---@class type-track.Unknown : type-track.Type
+	local UnknownInst = UnknownClass --[[@as type-track.Unknown]]
+
+	function UnknownInst:__tostring()
+		return "unknown"
+	end
+
+	---Evaluations are never valid on `Unknown`.
+	---@param op string
+	---@param params type-track.Type
+	---@return type-track.Type? returns
+	function UnknownInst:eval(op, params)
+		return nil
+	end
+
+	Unknown = UnknownClass()
+	unknown_var = Tuple({}, Unknown)
+end
+
+do -- Never
+	---@class type-track.Never.Class
+	---@overload fun(): type-track.Never
+	local NeverClass = muun("Never", Type)
+
+	---@class type-track.Never : type-track.Type
+	local NeverInst = NeverClass --[[@as type-track.Never]]
+
+	function NeverInst:__tostring()
+		return "never"
+	end
+
+	---Evaluations are always valid on `Never` and returns itself.
+	---@param op string
+	---@param params type-track.Type
+	---@return type-track.Type? returns
+	function NeverInst:eval(op, params)
+		return Never
+	end
+
+	---@param i number
+	---@return type-track.Type?
+	function NeverInst:at(i)
+		return Tuple.default_var_arg
+	end
+
+	Never = NeverClass()
 end
 
 return {
