@@ -147,6 +147,8 @@ local function is_subset(subset, superset)
 
 			return is_subset(subset, superset.types[1])
 		end
+
+		return false
 	elseif super_cls == Union then
 		---@cast superset type-track.Union
 		---@cast subset type-track.Tuple | type-track.Intersection | type-track.Operator | type-track.Literal
@@ -174,7 +176,10 @@ local function is_subset(subset, superset)
 	elseif sub_cls == Literal then
 		---@cast subset type-track.Literal
 		---@cast superset type-track.Operator
-		return is_subset(subset.ops, superset)
+		local subset_ops = subset.ops
+		if subset_ops then
+			return is_subset(subset_ops, superset)
+		end
 	elseif sub_cls == Operator then
 		---@cast subset type-track.Operator
 		---@cast superset type-track.Literal
