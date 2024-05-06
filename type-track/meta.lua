@@ -52,6 +52,52 @@ local unknown_var
 ---@type type-track.Never
 local Never
 
+---@alias type-track.GenericOperator.derive_fn fun(type_params: type-track.Type): (params: type-track.Type?, returns: type-track.Type?)
+---@alias type-track.GenericOperator.infer_fn fun(params: type-track.Type, returns: type-track.Type?): (type_params: type-track.Type?)
+
+---an operator that captures its types on usage
+---
+---```lua
+---a: <T>(T) -> T -- a generic call operator
+---b: (string) -> string
+---
+----- valid
+---b = a
+---
+----- NOT valid
+---a = b
+---```
+---
+---The constructor takes a `result_of` and `params_of` argument.
+---
+---- `result_of` takes its type parameters and returns its usage.
+---
+---- `params_of` takes the parameters from its usage and returns its type
+---  parameters.
+---
+---Example:
+---
+---```lua
+----- <T>(T, T) -> (T?)
+---local example = GenericOperator(
+---  'call',
+---  function(type_params) -- derive
+---    local T = type_params:at(1)
+---    if not T then return nil end
+---
+---    return Tuple({T, T}), T + _nil
+---  end,
+---  function(params, returns) -- infer
+---    return params:at(1)
+---  end
+---)
+---```
+---
+---generating the type functions programmatically has not been explored.
+---@class type-track.GenericOperator.Class
+---@overload fun(op: string, derive_fn: type-track.GenericOperator.derive_fn, infer_fn: type-track.GenericOperator.infer_fn): type-track.GenericOperator
+local GenericOperator
+
 ---@type fun(actual: type-track.Type, list: type-track.Type[], i?: integer, j?: integer): boolean
 local is_subset_of_any
 
@@ -65,7 +111,15 @@ local all_are_subset
 local any_are_subset
 
 ---determines whether `subtype` is a subset of `supertype`. This operation is
----available across all
+---supported for every type in this file.
+---
+---It is essentially a test to see if this assignment passes:
+---
+---```lua
+---x: subset
+---y: superset
+---y = x
+---```
 ---@param subset type-track.Type
 ---@param superset type-track.Type
 ---@return boolean
@@ -85,19 +139,39 @@ local function is_subset(subset, superset)
 	subset = subset:unify()
 	superset = superset:unify()
 
-	---@diagnostic disable-next-line: undefined-field, need-check-nil
-	while subset.__class == LazyRef and subset.value do
-		---@cast subset type-track.LazyRef
-		subset = subset.value
+	if _G.DEBUG then
+		print(subset, " <: ", superset)
 	end
-	---@cast subset type-track.Type
 
-	---@diagnostic disable-next-line: undefined-field, need-check-nil
-	while superset.__class == LazyRef and superset.value do
-		---@cast superset type-track.LazyRef
-		superset = superset.value
+	while true do
+		local sub_cls = subset.__class
+		if sub_cls == LazyRef then
+			---@cast subset type-track.LazyRef
+			subset = subset:unwrap()
+		elseif sub_cls == GenericOperator then
+			---@cast subset type-track.GenericOperator
+			local new_subset = subset:match(superset)
+			if not new_subset then
+				return false
+			end
+			subset = new_subset
+		else
+			break
+		end
 	end
-	---@cast superset type-track.Type
+
+	while true do
+		local super_cls = superset.__class
+		if super_cls == LazyRef then
+			---@cast superset type-track.LazyRef
+			superset = superset:unwrap()
+		elseif super_cls == GenericOperator then
+			---@cast superset type-track.GenericOperator
+			superset = assert(superset.derive_fn(unknown_var))
+		else
+			break
+		end
+	end
 
 	if subset == Never or superset == Unknown then
 		return true
@@ -262,6 +336,16 @@ do -- Type
 	---@return type-track.Type? returns
 	function TypeInst:eval(op, params)
 		error("not implemented")
+	end
+
+	---returns what parameters this type supports for `op`
+	---
+	---If `nil` is returned, the operation isn't compatible. Otherwise, a type is
+	---returned. A `Tuple` is used for multiple parameter types.
+	---@param op string
+	---@return type-track.Type?
+	function TypeInst:get_params(op)
+		return nil
 	end
 
 	---returns the `i`th element in this type
@@ -507,6 +591,17 @@ do -- Tuple
 		end
 	end
 
+	---@param op string
+	---@return type-track.Type?
+	function TupleInst:get_params(op)
+		local first_elem = self:at(1)
+		if first_elem then
+			return first_elem:get_params(op)
+		else
+			return nil
+		end
+	end
+
 	---@return type-track.Type
 	function TupleInst:_unify()
 		local unified_args = {}
@@ -589,6 +684,16 @@ do -- Operator
 		end
 	end
 
+	---@param op string
+	---@return type-track.Type? params
+	function OperatorInst:get_params(op)
+		if op == self.op then
+			return self.params
+		else
+			return nil
+		end
+	end
+
 	function OperatorInst:_unify()
 		return Operator(self.op, self.params:unify(), self.returns:unify())
 	end
@@ -666,6 +771,24 @@ do -- Union
 
 		assert(#all_returns >= 2, "evaluation on union did not have enough types")
 		return Union(all_returns)
+	end
+
+	---@param op string
+	---@return type-track.Type?
+	function UnionInst:get_params(op)
+		---@type type-track.Type[]
+		local all_params = {}
+		for _, type in ipairs(self.types) do
+			local params = type:get_params(op)
+			if params then
+				table.insert(all_params, params)
+			else
+				return nil
+			end
+		end
+
+		assert(#all_params >= 2)
+		return Intersection(all_params)
 	end
 
 	---@param types type-track.Type[]
@@ -790,6 +913,27 @@ do -- Intersection
 			return all_returns[1]
 		else
 			return Intersection(all_returns)
+		end
+	end
+
+	---@param op string
+	---@return type-track.Type?
+	function IntersectionInst:get_params(op)
+		---@type type-track.Type[]
+		local all_params = {}
+		for _, type in ipairs(self.types) do
+			local params = type:get_params(op)
+			if params then
+				table.insert(all_params, params)
+			end
+		end
+
+		if #all_params == 0 then
+			return nil
+		elseif #all_params == 1 then
+			return all_params[1]
+		else
+			return Union(all_params)
 		end
 	end
 
@@ -993,6 +1137,11 @@ do -- LazyRef
 	end
 
 	---@return type-track.Type?
+	function LazyRefInst:get_params(...)
+		return self:unwrap():get_params(...)
+	end
+
+	---@return type-track.Type?
 	function LazyRefInst:at(...)
 		return self:unwrap():at(...)
 	end
@@ -1060,6 +1209,110 @@ do -- Never
 	Never = NeverClass()
 end
 
+do -- GenericOperator
+	---@class type-track.GenericOperator : type-track.Type
+	---@field op string
+	---@field derive_fn type-track.GenericOperator.derive_fn
+	---@field infer_fn type-track.GenericOperator.infer_fn
+	local GenericOperatorInst = muun("GenericOperator", Type)
+
+	GenericOperator = GenericOperatorInst --[[@as type-track.GenericOperator.Class]]
+
+	---@param op string
+	---@param derive_fn type-track.GenericOperator.derive_fn
+	---@param infer_fn type-track.GenericOperator.infer_fn
+	function GenericOperator:new(op, derive_fn, infer_fn)
+		self.op = op
+		self.derive_fn = derive_fn
+		self.infer_fn = infer_fn
+	end
+
+	---@param subset type-track.GenericOperator
+	---@param superset type-track.GenericOperator
+	---@return boolean
+	function GenericOperator.is_subset(subset, superset)
+		local subset_params, subset_returns = subset.derive_fn(unknown_var)
+		if not subset_params or not subset_returns then
+			return false
+		end
+
+		local superset_params, superset_returns = superset.derive_fn(unknown_var)
+		if not superset_params or not superset_returns then
+			return false
+		end
+
+		return subset.op == superset.op
+			and is_subset(subset_params, superset_params)
+			and is_subset(superset_returns, subset_returns)
+	end
+
+	---@param op string
+	---@param params type-track.Type
+	---@return type-track.Type?
+	function GenericOperatorInst:eval(op, params)
+		if op ~= self.op then
+			return nil
+		end
+
+		local type_params = self.infer_fn(params)
+		if not type_params then
+			return nil
+		end
+
+		local self_params, self_returns = self.derive_fn(type_params)
+		if self_params and is_subset(params, self_params) then
+			return self_returns
+		else
+			return nil
+		end
+	end
+
+	---@param op string
+	---@return type-track.Type?
+	function GenericOperatorInst:get_params(op)
+		if op ~= self.op then
+			return nil
+		end
+
+		local self_params = self.derive_fn(unknown_var)
+		return self_params
+	end
+
+	---returns a concrete `Operator` that is a subset of `superset` for this
+	---type's `op`
+	---
+	---If `nil` is returned, then `supertype` could not be matched for this
+	---operator.
+	---@param superset type-track.Type
+	---@return type-track.Type? concrete
+	function GenericOperatorInst:match(superset)
+		local super_params = superset:get_params(self.op)
+		if not super_params then
+			return nil
+		end
+
+		local super_returns = superset:eval(self.op, super_params)
+		local type_params = self.infer_fn(super_params, super_returns)
+		if not type_params then
+			return nil
+		end
+
+		local self_params, self_returns = self.derive_fn(type_params)
+		if not self_params then
+			return nil
+		end
+
+		return Operator(self.op, self_params, self_returns)
+	end
+
+	---@param visited { [type-track.Type]: true? }
+	function GenericOperatorInst:__tostring(visited)
+		visited = visited or { n = 0 }
+		visited[self] = true
+		return string.format("{ %s(): %s }", self.op, self.derive_fn(unknown_var))
+	end
+end
+
 return {
 	Tuple = Tuple,
 	Operator = Operator,
@@ -1069,6 +1322,7 @@ return {
 	LazyRef = LazyRef,
 	Never = Never,
 	Unknown = Unknown,
+	GenericOperator = GenericOperator,
 
 	Type = Type,
 

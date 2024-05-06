@@ -1,12 +1,15 @@
 local meta_types = require("type-track.meta")
+local muun = require("type-track.muun")
 
-local Tuple, Operator, Union, Intersection, Literal, LazyRef =
+local Type, Tuple, Operator, Literal, LazyRef, Never, Unknown, GenericOperator =
+	meta_types.Type,
 	meta_types.Tuple,
 	meta_types.Operator,
-	meta_types.Union,
-	meta_types.Intersection,
 	meta_types.Literal,
-	meta_types.LazyRef
+	meta_types.LazyRef,
+	meta_types.Never,
+	meta_types.Unknown,
+	meta_types.GenericOperator
 
 ---@generic F
 ---@param f F
@@ -25,11 +28,13 @@ local function memoize(f)
 end
 
 local T = Tuple
-local never = T({})
+
+local unit = T({})
 
 local number = LazyRef()
 local _string = LazyRef()
 local stringlib = LazyRef()
+local _false = LazyRef()
 
 ---@param value string
 ---@return type-track.Literal
@@ -38,35 +43,32 @@ local function string_of(value)
 end
 string_of = memoize(string_of)
 
-local thread = Operator("type", never, string_of("thread"))
-local userdata = Operator("type", never, string_of("userdata"))
+local _nil = Operator("type", Never, string_of("nil"))
+	* Operator("truthy", Never, _false)
+
+Tuple.default_var_arg = _nil
+
+local thread = Operator("type", Never, string_of("thread"))
+local userdata = Operator("type", Never, string_of("userdata"))
 
 local string_or_num = _string + number
 local concat_call = Operator("concat", string_or_num, _string)
 
--- `unknown` is the top type of this system
--- there's not really a good way to define this type semantically, other than
--- hard-coding it into `is_subset` or smth
-local unknown = LazyRef()
-local unknown_var = T({}, unknown)
+local unknown_var = T({}, Unknown)
 
-local function_type = Operator("type", never, string_of("function"))
+local function_type = Operator("type", Never, string_of("function"))
 local _function = function_type * Operator("call", unknown_var, unknown_var)
 
-local boolean = Operator("type", never, string_of("boolean"))
-local _false = LazyRef()
+local boolean = Operator("type", Never, string_of("boolean"))
 
 local _true = Literal(true, boolean)
-_false.value = Literal(false, boolean * Operator("truthy", never, _false))
+_false.value = Literal(false, boolean * Operator("truthy", Never, _false))
 
-local _nil = Operator("type", never, string_of("nil"))
-	* Operator("truthy", never, _false)
-
-_string.value = Operator("type", never, string_of("string"))
+_string.value = Operator("type", Never, string_of("string"))
 	* concat_call
 	* stringlib
 
-number.value = Operator("type", never, string_of("number"))
+number.value = Operator("type", Never, string_of("number"))
 	* Operator("add", number, number)
 	* Operator("sub", number, number)
 	* Operator("mul", number, number)
@@ -75,16 +77,24 @@ number.value = Operator("type", never, string_of("number"))
 	* Operator("pow", number, number)
 	* concat_call
 
-local _table = Operator("type", never, string_of("table"))
-	* Operator("index", unknown, unknown)
-	* Operator("newindex", T({ unknown, unknown }), never)
-	* Operator("len", never, number)
+local _table = Operator("type", Never, string_of("table"))
+	* Operator("index", Unknown, Unknown)
+	* Operator("newindex", T({ Unknown, Unknown }), Never)
+	* Operator("len", Never, number)
 
 ---@param params type-track.Type
 ---@param returns type-track.Type
 ---@return type-track.Type func
 local function func(params, returns)
 	return function_type * Operator("call", params, returns)
+end
+
+---@param derive_fn type-track.GenericOperator.derive_fn
+---@param infer_fn type-track.GenericOperator.infer_fn
+---@return type-track.Type func
+local function gen_func(derive_fn, infer_fn)
+	return Operator("type", Never, string_of("function"))
+		* GenericOperator("call", derive_fn, infer_fn)
 end
 
 local num2_to_num = func(T({ number, number }), number)
@@ -94,16 +104,19 @@ local num_var = T({}, number)
 local string_or_num_var = T({}, string_or_num)
 
 ---@param t type-track.Type
+---@return type-track.Type
 local function array_of(t)
-	return Operator("index", number, t)
-		* Operator("newindex", T({ number, t }), never)
+	return Operator("type", Never, string_of("table"))
+		* Operator("index", number, t)
+		* Operator("newindex", T({ number, t }), Never)
 end
 
 ---@param tab { [string]: type-track.Type }
 ---@return type-track.Type
 local function lib(tab)
 	---@type type-track.Type
-	local result = Operator("newindex", T({ unknown, unknown }), never)
+	local result = Operator("type", Never, string_of("table"))
+		* Operator("newindex", T({ Unknown, Unknown }), Never)
 	for k, v in pairs(tab) do
 		result = result * Operator("index", string_of(k), v)
 	end
@@ -111,7 +124,7 @@ local function lib(tab)
 	return result
 end
 
-local string_or_num_or_nil = _string + number + _nil
+local string_or_num_or_nil = string_or_num + _nil
 
 -- stringlib
 stringlib.value = lib({
@@ -119,13 +132,13 @@ stringlib.value = lib({
 	char = func(string_or_num_var, _string),
 	dump = func(_function, _string),
 	find = func(
-		T({ string_or_num, string_or_num, string_or_num_or_nil, unknown }),
+		T({ string_or_num, string_or_num, string_or_num_or_nil, Unknown }),
 		(_nil + T({ number, number }, string_or_num))
 	),
-	format = func(T({ string_or_num }, unknown), _string),
+	format = func(T({ string_or_num }, Unknown), _string),
 	gmatch = func(
 		T({ string_or_num, string_or_num }),
-		func(never, string_or_num_var)
+		func(unit, string_or_num_var)
 	),
 	gsub = func(
 		T({
@@ -153,12 +166,12 @@ local tablelib = lib({
 		T({ array_of(_string), string_or_num_or_nil, num_or_nil, num_or_nil }),
 		_string
 	),
-	insert = func(T({ _table, unknown }), never)
-		* func(T({ _table, number, unknown }), never),
+	insert = func(T({ _table, Unknown }), unit)
+		* func(T({ _table, number, Unknown }), unit),
 
 	maxn = func(_table, number),
-	remove = func(T({ _table, num_or_nil }), unknown),
-	sort = func(T({ _table, _function }), never),
+	remove = func(T({ _table, num_or_nil }), Unknown),
+	sort = func(T({ _table, _function }), unit),
 })
 
 local num_to_num = func(number, number)
@@ -190,8 +203,8 @@ local mathlib = lib({
 	pi = number,
 	pow = num2_to_num,
 	rad = num_to_num,
-	random = func(never, number) * num_to_num * num2_to_num,
-	randomseed = func(number, never),
+	random = func(unit, number) * num_to_num * num2_to_num,
+	randomseed = func(number, unit),
 	sin = num_to_num,
 	sinh = num_to_num,
 	sqrt = num_to_num,
@@ -238,40 +251,33 @@ local file_seek_mode_or_nil = file_seek_mode + _nil
 
 local vbuf_mode = string_of("no") + string_of("full") + string_of("line")
 
-local implicit_file = func(never, file_or_fail) * func(file, true_or_fail)
+local implicit_file = func(unit, file_or_fail) * func(file, true_or_fail)
 local open_file =
 	func(T({ string_or_num, file_open_mode + _nil }), file_or_fail)
 
 local iolib = lib({
-	close = func(file, true_or_fail) * func(never, true_or_fail),
-	flush = func(never, true_or_fail),
+	close = func(file, true_or_fail) * func(unit, true_or_fail),
+	flush = func(unit, true_or_fail),
 	input = implicit_file,
-	lines = func(never, func(never, _string))
-		* func(string_or_num, func(never, _string)),
+	lines = func(unit, func(unit, _string))
+		* func(string_or_num, func(unit, _string)),
 	open = open_file,
 	output = implicit_file,
 	popen = open_file,
 	read = func(file_read_modevar, string_or_num_var),
-	tmpfile = func(never, file_or_fail),
-	type = func(unknown, file_type),
+	tmpfile = func(unit, file_or_fail),
+	type = func(Unknown, file_type),
 	write = func(string_or_num_var, file_or_fail),
 })
 
 file.value = userdata
-	* Operator(
-		"iolib.type",
-		never,
-		string_of("file") + string_of("closed file")
-	)
+	* Operator("iolib.type", Never, string_of("file") + string_of("closed file"))
 	* lib({
 		close = func(file, true_or_fail),
 		flush = func(file, true_or_fail),
-		lines = func(file, func(never, _string)),
+		lines = func(file, func(unit, _string)),
 		read = func(T({ file }, file_read_mode), string_or_num_var),
-		seek = func(
-			T({ file, file_seek_mode_or_nil, num_or_nil }),
-			num_or_fail
-		),
+		seek = func(T({ file, file_seek_mode_or_nil, num_or_nil }), num_or_fail),
 		setvbuf = func(T({ file, vbuf_mode, num_or_nil }), true_or_fail),
 		write = func(T({ file }, string_or_num), file_or_fail),
 	})
@@ -316,20 +322,20 @@ local os_category = string_of("all")
 local string_or_nil = _string + _nil
 
 local oslib = lib({
-	clock = func(never, number),
+	clock = func(unit, number),
 	date = func(
 		T({ string_of("*t") + string_of("!*t"), num_or_nil }),
 		osdate_table
 	) * func(T({ _string, num_or_nil }), _string),
 	difftime = num2_to_num,
 	execute = func(_nil, true_or_nil) * func(_string, os_result),
-	exit = func(string_or_num_or_nil, never),
+	exit = func(string_or_num_or_nil, unit),
 	getenv = func(string_or_num, _string),
 	remove = func(string_or_num, true_or_fail),
 	rename = func(T({ string_or_num, string_or_num }), true_or_fail),
 	setlocale = func(T({ string_or_nil, os_category }), string_or_nil),
 	time = func(ostime_table, number),
-	tmpname = func(never, _string),
+	tmpname = func(unit, _string),
 })
 
 local coroutine_status = string_of("running")
@@ -340,7 +346,7 @@ local coroutine_status = string_of("running")
 -- coroutinelib
 local coroutinelib = lib({
 	create = func(_function, thread),
-	resume = func(T({ thread }, unknown), T({ boolean }, unknown)),
+	resume = func(T({ thread }, Unknown), T({ boolean }, Unknown)),
 	status = func(thread, coroutine_status),
 	wrap = func(_function, _function),
 	yield = _function,
@@ -352,13 +358,75 @@ local hook_event = string_of("call")
 	+ string_of("line")
 	+ string_of("count")
 
-local debug_hook = func(T({ hook_event, number }), never)
+local debug_hook = func(T({ hook_event, number }), unit)
+local hook_mask = string_of("c")
+	+ string_of("r")
+	+ string_of("l")
+	+ string_of("")
+
+local thread_or_nil = thread + _nil
+local func_or_num = _function + number
+
+local debug_info = lib({
+	currentline = number,
+	func = _function,
+	isvararg = boolean,
+	lastlinedefined = number,
+	linedefined = number,
+	namewhat = _string,
+	nparams = number,
+	nups = number,
+	short_src = _string,
+	source = _string,
+	what = _string,
+})
 
 -- debuglib
 local debuglib = lib({
-	debug = func(never, never),
+	debug = func(unit, unit),
 	getfenv = func(_function, _table),
-	gethook = T({ debug_hook }),
+	gethook = func(thread_or_nil, _nil + T({ debug_hook, hook_mask, number })),
+	getinfo = func(T({ thread, func_or_num, _string }), _table)
+		* func(T({ func_or_num, _string }, _table))
+		* func(T({ thread, func_or_num }), debug_info)
+		* func(func_or_num, debug_info),
+	getlocal = func(T({ thread, number, number }), T({
+		_string,
+		Unknown --[[should be "any"]],
+	}) + unit),
+	getmetatable = func(Unknown, _table + _nil),
+	getregistry = func(unit, _table),
+	getupvalue = func(T({ _function, number }), T({ _string, Unknown }) + unit),
+	setfenv = gen_func(function(tup) -- result_of
+		local A = tup:at(1)
+		local R = tup:at(2)
+		if not A or not R then
+			return nil
+		end
+
+		local func_arg = func(A, R)
+		return func(T({ func_arg, _table }), func_arg)
+	end, function(params) -- params_of
+		local func_arg = params:at(1)
+		local table_arg = params:at(2)
+		if
+			not func_arg
+			or not table_arg
+			or func_arg:eval("type", Never) ~= string_of("function")
+		then
+			return nil
+		end
+
+		local func_params = func_arg:get_params("call")
+		if func_params then
+			local func_returns = func_arg:eval("call", func_params)
+			if func_returns then
+				return T({ func_params, func_returns })
+			end
+		end
+
+		return nil
+	end),
 })
 
 -- packagelib
@@ -410,4 +478,5 @@ return {
 	mathlib = mathlib,
 	iolib = iolib,
 	oslib = oslib,
+	debuglib = debuglib,
 }
