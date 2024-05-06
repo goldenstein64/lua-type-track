@@ -935,18 +935,22 @@ do -- Literal
 		self.ops = ops
 	end
 
-	---@param op string
-	---@param params type-track.Type
-	---@return type-track.Type? returns
-	function Literal:eval(op, params)
-		return self.ops:eval(op, params)
-	end
-
 	---@param subset type-track.Literal
 	---@param superset type-track.Literal
 	---@return boolean
 	function Literal.is_subset(subset, superset)
 		return subset.value == superset.value
+	end
+
+	---@param op string
+	---@param params type-track.Type
+	---@return type-track.Type? returns
+	function Literal:eval(op, params)
+		if self.ops then
+			return self.ops:eval(op, params)
+		else
+			return nil
+		end
 	end
 
 	function LiteralInst:__tostring(visited)
