@@ -362,7 +362,6 @@ do -- Type
 		-- set metamethods
 		base.__add = super_base.__add
 		base.__mul = super_base.__mul
-		base.__div = super_base.__div
 	end
 end
 
