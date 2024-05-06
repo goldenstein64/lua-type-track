@@ -857,7 +857,12 @@ do -- LazyRef
 	---@return type-track.Type
 	function LazyRefInst:unwrap()
 		local value = assert(self.value, "attempt to use an empty LazyRef")
-		return value
+		if value.__class == LazyRef then
+			---@cast value type-track.LazyRef
+			return value:unwrap()
+		else
+			return value
+		end
 	end
 
 	---@return type-track.Type? returns
