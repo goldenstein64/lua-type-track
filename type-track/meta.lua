@@ -589,7 +589,7 @@ do -- Union
 		---@type type-track.Type[]
 		local all_returns = {}
 
-		-- if any operation is unsupported, the entire union doesn't support it
+		-- if any element doesn't support it, the entire union doesn't support it
 		for _, type in ipairs(self.types) do
 			local returns = type:eval(op, params)
 			if returns then
@@ -599,16 +599,6 @@ do -- Union
 			end
 		end
 
-		-- if we get here, the call has succeeded...
-		-- what should the return types be?
-		--[[
-			a: () -> string
-			b: () -> number
-			f: a | b
-
-			c = f() -- it could be a string or a number...
-		]]
-		-- I guess return a union of the return values
 		assert(#all_returns >= 2, "evaluation on union did not have enough types")
 		return Union(all_returns)
 	end
