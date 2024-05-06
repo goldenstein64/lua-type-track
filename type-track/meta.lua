@@ -2,6 +2,7 @@
 
 local muun = require("type-track.muun")
 local Inheritable = require("type-track.Inheritable")
+local permute = require("type-track.permute")
 
 ---a multi-value type. Importantly, it describes how arguments and return
 ---values are structured.
@@ -70,7 +71,7 @@ local any_are_subset
 ---@return boolean
 local function is_subset(subset, superset)
 	-- Tuple, Union, Intersection, Operator, Literal
-	-- 36 combinations
+	-- 25 combinations
 	-- sub-super
 	-- TT TU TI TO TL
 	-- UT UU UI UO UL
@@ -94,6 +95,8 @@ local function is_subset(subset, superset)
 		superset = superset.value
 	end
 	---@cast superset type-track.Type
+	subset = subset:unify()
+	superset = superset:unify()
 
 	if subset == Never or superset == Unknown then
 		return true
@@ -238,6 +241,7 @@ end
 
 do -- Type
 	---@class type-track.Type : Inheritable
+	---@field unified type-track.Type?
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator add(type-track.Type): type-track.Union
 	local TypeInst = muun("Type", Inheritable)
@@ -272,10 +276,30 @@ do -- Type
 
 	---defines the algorithm for converting a type into its
 	---simplest form. It must always return a new Type.
-	---@param visited { [type-track.Type]: true? }
+	---
+	---Note: If you plan to change the behavior of this method, override
+	---`Type:_unify()`.
 	---@return type-track.Type
-	function TypeInst:unify(visited)
-		visited[self] = true
+	function TypeInst:unify()
+		if self.unified then
+			return self.unified
+		end
+
+		local proxy = LazyRef()
+		proxy.unified = proxy
+		self.unified = proxy
+		local result = self:_unify()
+		proxy.value = result
+		proxy.unified = result
+		self.unified = result
+		return result
+	end
+
+	---the protected method for implementing `Type:unify()`. The public method
+	---makes sure to call `_unify` only when the type hasn't been unified before
+	---and sets `unified` to a proxy `LazyRef` before calling.
+	---@return type-track.Type unified
+	function TypeInst:_unify()
 		return self
 	end
 
@@ -482,6 +506,21 @@ do -- Tuple
 		end
 	end
 
+	---@return type-track.Type
+	function TupleInst:_unify()
+		local unified_args = {}
+		for i, elem in ipairs(self.types) do
+			unified_args[i] = elem:unify()
+		end
+
+		local unified_var_args = nil
+		if self.var_arg then
+			unified_var_args = self.var_arg:unify()
+		end
+
+		return Tuple(unified_args, unified_var_args)
+	end
+
 	local VAR_STR = "...%s"
 
 	---@param visited { [type-track.Type]: number?, n: number }?
@@ -542,15 +581,15 @@ do -- Operator
 			return nil
 		end
 
-		if params.__class ~= Tuple then
-			params = Tuple({ params })
-		end
-
 		if is_subset(params, self.params) then
 			return self.returns
 		else
 			return nil
 		end
+	end
+
+	function OperatorInst:_unify()
+		return Operator(self.op, self.params:unify(), self.returns:unify())
 	end
 
 	---@param visited { [type-track.Type]: number?, n: number }
@@ -570,7 +609,6 @@ end
 do -- Union
 	---@class type-track.Union : type-track.Type
 	---@field types type-track.Type[]
-	---@field is_unified boolean
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator add(type-track.Type): type-track.Union
 	local UnionInst = muun("Union", Type)
@@ -582,7 +620,6 @@ do -- Union
 	function Union:new(types)
 		assert(#types >= 2, "unions must have at least two items")
 		self.types = types
-		self.is_unified = false
 		-- I'll worry about optimizing this later
 	end
 
@@ -630,45 +667,39 @@ do -- Union
 		return Union(all_returns)
 	end
 
-	---@param visited { [type-track.Type]: true? }
-	---@return type-track.Type
-	function UnionInst:unify(visited)
-		if visited[self] then
-			return self
-		end
-		visited[self] = true
-
-		if self.is_unified then
-			return self
-		end
-
-		local flattened = {} ---@type type-track.Type[]
-		for _, type in ipairs(self.types) do
-			type = type:unify(visited)
-			if type == Unknown then
-				return Unknown
-			elseif type.__class == Union then
-				---@cast type type-track.Union
-				local types = type.types
-				table.move(types, 1, #types, #flattened + 1, flattened)
-			elseif not is_subset_of_any(type, flattened) then
-				for i = #flattened, 1, -1 do
-					local type2 = flattened[i]
-					if is_subset(type2, type) then
-						table.remove(flattened, i)
+	---@param types type-track.Type[]
+	local function flatten_union(types)
+		local result = {} ---@type type-track.Type[]
+		for _, elem in ipairs(types) do
+			elem = elem:unify()
+			if elem == Unknown then
+				return { Unknown }
+			elseif elem.__class == Union then
+				---@cast elem type-track.Union
+				local elem_types = elem.types
+				table.move(elem_types, 1, #elem_types, #result + 1, result)
+			elseif not is_subset_of_any(elem, result) then
+				for i = #result, 1, -1 do
+					local type2 = result[i]
+					if is_subset(type2, elem) then
+						table.remove(result, i)
 					end
 				end
-				table.insert(flattened, type)
+				table.insert(result, elem)
 			end
 		end
+		return result
+	end
+
+	---@return type-track.Type
+	function UnionInst:_unify()
+		local flattened = flatten_union(self.types)
 
 		assert(#flattened > 0, "no types to unify?")
 		if #flattened == 1 then
 			return flattened[1]
 		else
-			local result = Union(flattened)
-			result.is_unified = true
-			return result
+			return Union(flattened)
 		end
 	end
 
@@ -709,7 +740,6 @@ end
 do -- Intersection
 	---@class type-track.Intersection : type-track.Type
 	---@field types type-track.Type[]
-	---@field is_unified boolean
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator add(type-track.Type): type-track.Union
 	local IntersectionInst = muun("Intersection", Type)
@@ -722,7 +752,6 @@ do -- Intersection
 	function Intersection:new(types)
 		assert(#types >= 2, "intersections must have at least two items")
 		self.types = types
-		self.is_unified = false
 		-- I'll worry about optimizing this later
 	end
 
@@ -784,47 +813,95 @@ do -- Intersection
 		end
 	end
 
-	-- (A | B) & (A | C) == A | (B & C)
-	---@param visited { [type-track.Type]: true? }
-	---@return type-track.Type
-	function IntersectionInst:unify(visited)
-		if visited[self] then
-			return self
-		end
-		visited[self] = true
-
-		if self.is_unified then
-			return self
-		end
-
-		local flattened = {} ---@type type-track.Type[]
-		for _, type in ipairs(self.types) do
-			type = type:unify(visited)
-			if type == Never then
-				return Never
-			elseif type.__class == Intersection then
-				---@cast type type-track.Intersection
-				local types = type.types
-				table.move(types, 1, #types, #flattened + 1, flattened)
-			elseif not any_are_subset(flattened, type) then
-				for i = #flattened, 1, -1 do
-					local type2 = flattened[i]
-					if is_subset(type, type2) then
-						table.remove(flattened, i)
+	---@param types type-track.Type[]
+	---@return type-track.Type[]
+	local function flatten_intersection(types)
+		local result = {} ---@type type-track.Type[]
+		for _, elem in ipairs(types) do
+			elem = elem:unify()
+			if elem == Never then
+				return { Never }
+			elseif elem.__class == Intersection then
+				---@cast elem type-track.Intersection
+				local elem_types = elem.types
+				table.move(elem_types, 1, #elem_types, #result + 1, result)
+			elseif not any_are_subset(result, elem) then
+				for i = #result, 1, -1 do
+					local type2 = result[i]
+					if is_subset(elem, type2) then
+						table.remove(result, i)
 					end
 				end
-				table.insert(flattened, type)
+				table.insert(result, elem)
 			end
 		end
 
+		return result
+	end
+
+	---takes all the types that are to be intersected and returns all the types
+	---that are to be unioned
+	---@param types type-track.Type[]
+	---@return type-track.Type[]
+	local function distribute_unions(types)
+		local all_unions = {} ---@type type-track.Type[][]
+		local has_unions = false
+		for _, type in ipairs(types) do
+			if type.__class == LazyRef then
+				---@cast type type-track.LazyRef
+				type = type:unwrap()
+			end
+
+			if type.__class == Union then
+				---@cast type type-track.Union
+				table.insert(all_unions, type.types)
+				has_unions = true
+			else
+				table.insert(all_unions, { type })
+			end
+		end
+
+		if not has_unions then
+			if #types == 1 then
+				return types[1]
+			else
+				return Intersection(types)
+			end
+		end
+
+		local result = {} ---@type type-track.Type[][]
+		---@param permutation type-track.Type[]
+		for permutation in permute(all_unions) do
+			table.insert(result, Intersection(permutation))
+		end
+
+		return Union(result):unify()
+	end
+
+	-- since unions are more prevalent, intersections should look for unions in
+	-- their sub-elements and push them to the top of the type expression
+	-- A & (B | C) -> (A & B) | (A & C)
+	-- (A | B) & (C | D) -> (A & C) | (A & D) | (B & C) | (B & D)
+	-- (...union1) & (...union2) & ... & (unionN)
+	--   -> (union1[1] & union2[1] & ... & unionN[1])
+	--    | (union1[1] & union2[1] & ... & unionN[2])
+	--    | ...
+	--    | (union1[1] & union2[1] & ... & unionN[nn])
+	--    | (union1[1] & union2[1] & ... & unionN_1[2] & unionN[1])
+	--    | (union1[1] & union2[1] & ... & unionN_1[2] & unionN[2])
+	--    | ...
+	--    | (union1[1] & union2[1] & ... & unionN_1[2] & unionN[n])
+	--    | ...
+	--    | (union1[n1] & union2[n2] & ... & unionN[nn])
+	---@return type-track.Type
+	function IntersectionInst:_unify()
+		local flattened = flatten_intersection(self.types)
 		assert(#flattened > 0, "no types to unify?")
 		if #flattened == 1 then
 			return flattened[1]
-		else
-			local result = Intersection(flattened)
-			result.is_unified = true
-			return result
 		end
+
+		return distribute_unions(flattened)
 	end
 
 	function IntersectionInst:__tostring(visited)
@@ -915,10 +992,9 @@ do -- LazyRef
 		return self:unwrap():at(...)
 	end
 
-	---@param visited { [type-track.Type]: true? }
 	---@return type-track.Type
-	function LazyRefInst:unify(visited)
-		return self:unwrap():unify(visited)
+	function LazyRefInst:_unify()
+		return self:unwrap():unify()
 	end
 
 	function LazyRefInst:__tostring(...)

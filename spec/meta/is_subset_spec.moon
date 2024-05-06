@@ -8,6 +8,32 @@ describe 'is_subset', ->
 
 	A = Literal 'A'
 	B = Literal 'B'
+	C = Literal 'C'
+
+	it 'accepts A <: A | B', ->
+		assert.is_true is_subset A, A + B
+
+	it 'accepts A & B <: A', ->
+		assert.is_true is_subset A * B, A
+
+	it 'accepts A | (B & C) == (A | B) & (A | C)', ->
+		type1 = (A + (B * C))
+		type2 = ((A + B) * (A + C))
+
+		assert.is_true is_subset type1, type2
+		assert.is_true is_subset type2, type1
+
+	it 'accepts (A | B) & (A | C) <: A | B', ->
+		type1 = ((A + B) * (A + C))
+		type2 = A + B
+
+		assert.is_true is_subset type1, type2
+
+	it 'accepts A & B <: (A & B) | (A & C)', ->
+		type1 = (A * B)
+		type2 = ((A * B) + (A * C))
+
+		assert.is_true is_subset type1, type2
 
 	describe 'when compared up to tuples', ->
 		it 'accepts anything compared to zero elements', ->
