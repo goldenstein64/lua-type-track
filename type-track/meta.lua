@@ -711,7 +711,7 @@ do -- Union
 
 		for _, type in ipairs(self.types) do
 			local elem = type:at(i)
-			if elem ~= nil then
+			if elem then
 				table.insert(all_indexes, elem)
 			end
 		end
