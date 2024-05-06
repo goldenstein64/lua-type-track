@@ -355,8 +355,7 @@ do -- Type
 		return i == 1 and self or Tuple.default_var_arg
 	end
 
-	---defines the algorithm for converting a type into its
-	---simplest form. It must always return a new Type.
+	---converts a type into its simplest form. It always returns a new Type.
 	---
 	---Note: If you plan to change the behavior of this method, override
 	---`Type:_unify()`.
@@ -376,9 +375,13 @@ do -- Type
 		return result
 	end
 
-	---the protected method for implementing `Type:unify()`. The public method
-	---makes sure to call `_unify` only when the type hasn't been unified before
-	---and sets `unified` to a proxy `Free` before calling.
+	---defines the algorithm for converting a type into its simplest form. This
+	---is a protected method that implements `Type:unify()`. It must always
+	---return a new Type unless it is already in its simplest form.
+	---
+	---The public method makes sure to call `_unify` only when the type hasn't
+	---been unified before and sets `unified` to a proxy `Free` type before
+	---calling.
 	---@return type-track.Type unified
 	function TypeInst:_unify()
 		return self
