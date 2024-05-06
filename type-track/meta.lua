@@ -37,9 +37,9 @@ local Literal
 local Type
 
 ---allows separating a type's declaration from its definition
----@class type-track.LazyRef.Class
----@overload fun(): type-track.LazyRef
-local LazyRef
+---@class type-track.Free.Class
+---@overload fun(): type-track.Free
+local Free
 
 ---the top type. It behaves like a union of all types.
 ---@type type-track.Unknown
@@ -145,8 +145,8 @@ local function is_subset(subset, superset)
 
 	while true do
 		local sub_cls = subset.__class
-		if sub_cls == LazyRef then
-			---@cast subset type-track.LazyRef
+		if sub_cls == Free then
+			---@cast subset type-track.Free
 			subset = subset:unwrap()
 		elseif sub_cls == GenericOperator then
 			---@cast subset type-track.GenericOperator
@@ -162,8 +162,8 @@ local function is_subset(subset, superset)
 
 	while true do
 		local super_cls = superset.__class
-		if super_cls == LazyRef then
-			---@cast superset type-track.LazyRef
+		if super_cls == Free then
+			---@cast superset type-track.Free
 			superset = superset:unwrap()
 		elseif super_cls == GenericOperator then
 			---@cast superset type-track.GenericOperator
@@ -370,7 +370,7 @@ do -- Type
 			return self.unified
 		end
 
-		local proxy = LazyRef()
+		local proxy = Free()
 		proxy.unified = proxy
 		self.unified = proxy
 		local result = self:_unify()
@@ -382,7 +382,7 @@ do -- Type
 
 	---the protected method for implementing `Type:unify()`. The public method
 	---makes sure to call `_unify` only when the type hasn't been unified before
-	---and sets `unified` to a proxy `LazyRef` before calling.
+	---and sets `unified` to a proxy `Free` before calling.
 	---@return type-track.Type unified
 	function TypeInst:_unify()
 		return self
@@ -393,13 +393,13 @@ do -- Type
 	---@param other type-track.Type
 	---@return type-track.Union
 	function TypeInst:__add(other)
-		if self.__class == LazyRef then
-			---@cast self type-track.LazyRef
+		if self.__class == Free then
+			---@cast self type-track.Free
 			self = self:unwrap()
 		end
 
-		if other.__class == LazyRef then
-			---@cast other type-track.LazyRef
+		if other.__class == Free then
+			---@cast other type-track.Free
 			other = other:unwrap()
 		end
 
@@ -430,13 +430,13 @@ do -- Type
 	---@param other type-track.Type
 	---@return type-track.Intersection
 	function TypeInst:__mul(other)
-		if self.__class == LazyRef then
-			---@cast self type-track.LazyRef
+		if self.__class == Free then
+			---@cast self type-track.Free
 			self = self:unwrap()
 		end
 
-		if other.__class == LazyRef then
-			---@cast other type-track.LazyRef
+		if other.__class == Free then
+			---@cast other type-track.Free
 			other = other:unwrap()
 		end
 
@@ -992,8 +992,8 @@ do -- Intersection
 		local all_unions = {} ---@type type-track.Type[][]
 		local has_unions = false
 		for _, type in ipairs(types) do
-			if type.__class == LazyRef then
-				---@cast type type-track.LazyRef
+			if type.__class == Free then
+				---@cast type type-track.Free
 				type = type:unwrap()
 			end
 
@@ -1111,20 +1111,20 @@ do -- Literal
 	end
 end
 
-do -- LazyRef
-	---@class type-track.LazyRef : type-track.Type
+do -- Free
+	---@class type-track.Free : type-track.Type
 	---@field value type-track.Type?
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator add(type-track.Type): type-track.Union
-	local LazyRefInst = muun("LazyRef", Type)
+	local FreeInst = muun("Free", Type)
 
-	LazyRef = LazyRefInst --[[@as type-track.LazyRef.Class]]
+	Free = FreeInst --[[@as type-track.Free.Class]]
 
 	---@return type-track.Type
-	function LazyRefInst:unwrap()
-		local value = assert(self.value, "attempt to use an empty LazyRef")
-		if value.__class == LazyRef then
-			---@cast value type-track.LazyRef
+	function FreeInst:unwrap()
+		local value = assert(self.value, "attempt to use an empty Free type")
+		if value.__class == Free then
+			---@cast value type-track.Free
 			return value:unwrap()
 		else
 			return value
@@ -1132,26 +1132,26 @@ do -- LazyRef
 	end
 
 	---@return type-track.Type? returns
-	function LazyRefInst:eval(...)
+	function FreeInst:eval(...)
 		return self:unwrap():eval(...)
 	end
 
 	---@return type-track.Type?
-	function LazyRefInst:get_params(...)
+	function FreeInst:get_params(...)
 		return self:unwrap():get_params(...)
 	end
 
 	---@return type-track.Type?
-	function LazyRefInst:at(...)
+	function FreeInst:at(...)
 		return self:unwrap():at(...)
 	end
 
 	---@return type-track.Type
-	function LazyRefInst:_unify()
+	function FreeInst:_unify()
 		return self:unwrap():unify()
 	end
 
-	function LazyRefInst:__tostring(...)
+	function FreeInst:__tostring(...)
 		return self:unwrap():__tostring(...)
 	end
 end
@@ -1319,7 +1319,7 @@ return {
 	Union = Union,
 	Intersection = Intersection,
 	Literal = Literal,
-	LazyRef = LazyRef,
+	Free = Free,
 	Never = Never,
 	Unknown = Unknown,
 	GenericOperator = GenericOperator,

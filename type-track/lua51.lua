@@ -1,12 +1,12 @@
 local meta_types = require("type-track.meta")
 local muun = require("type-track.muun")
 
-local Type, Tuple, Operator, Literal, LazyRef, Never, Unknown, GenericOperator =
+local Type, Tuple, Operator, Literal, Free, Never, Unknown, GenericOperator =
 	meta_types.Type,
 	meta_types.Tuple,
 	meta_types.Operator,
 	meta_types.Literal,
-	meta_types.LazyRef,
+	meta_types.Free,
 	meta_types.Never,
 	meta_types.Unknown,
 	meta_types.GenericOperator
@@ -31,10 +31,10 @@ local T = Tuple
 
 local unit = T({})
 
-local number = LazyRef()
-local _string = LazyRef()
-local stringlib = LazyRef()
-local _false = LazyRef()
+local number = Free()
+local _string = Free()
+local stringlib = Free()
+local _false = Free()
 
 ---@param value string
 ---@return type-track.Literal
@@ -214,7 +214,7 @@ local mathlib = lib({
 
 local file_type = string_of("file") + string_of("closed file") + _nil
 
-local file = LazyRef()
+local file = Free()
 local fail = T({ _nil, _string })
 
 local true_or_fail = _true + fail
