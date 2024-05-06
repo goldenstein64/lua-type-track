@@ -860,17 +860,14 @@ do -- LazyRef
 		return value
 	end
 
-	---@param op string
-	---@param params type-track.Type
 	---@return type-track.Type? returns
-	function LazyRefInst:eval(op, params)
-		return self:unwrap():eval(op, params)
+	function LazyRefInst:eval(...)
+		return self:unwrap():eval(...)
 	end
 
-	---@param i integer
 	---@return type-track.Type?
-	function LazyRefInst:at(i)
-		return self:unwrap():at(i)
+	function LazyRefInst:at(...)
+		return self:unwrap():at(...)
 	end
 
 	---@param visited { [type-track.Type]: true? }
@@ -879,8 +876,8 @@ do -- LazyRef
 		return self:unwrap():unify(visited)
 	end
 
-	function LazyRefInst:__tostring()
-		return self:unwrap():__tostring()
+	function LazyRefInst:__tostring(...)
+		return self:unwrap():__tostring(...)
 	end
 end
 
