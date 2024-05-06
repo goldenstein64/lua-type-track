@@ -482,6 +482,8 @@ do -- Tuple
 		end
 	end
 
+	local VAR_STR = "...%s"
+
 	---@param visited { [type-track.Type]: number?, n: number }?
 	---@return string
 	function TupleInst:__tostring(visited)
