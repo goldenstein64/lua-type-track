@@ -139,10 +139,6 @@ local function is_subset(subset, superset)
 	subset = subset:unify()
 	superset = superset:unify()
 
-	if _G.DEBUG then
-		print(subset, " <: ", superset)
-	end
-
 	while true do
 		local sub_cls = subset.__class
 		if sub_cls == Free then
