@@ -471,6 +471,11 @@ do -- Tuple
 		for _, t in ipairs(self.types) do
 			table.insert(strings, t:sub_visited(visited))
 		end
+
+		if self.var_arg ~= Tuple.default_var_arg and self.var_arg then
+			table.insert(strings, VAR_STR:format(self.var_arg:sub_visited(visited)))
+		end
+
 		return string.format("(%s)", table.concat(strings, ", "))
 	end
 end
@@ -668,6 +673,8 @@ do -- Union
 
 	---@param visited { [type-track.Type]: number?, n: number }
 	function UnionInst:__tostring(visited)
+		visited = visited or { n = 0 }
+
 		local strings = {} ---@type string[]
 		for _, t in ipairs(self.types) do
 			table.insert(strings, t:sub_visited(visited))
@@ -799,9 +806,11 @@ do -- Intersection
 	end
 
 	function IntersectionInst:__tostring(visited)
+		visited = visited or { n = 0 }
+
 		local strings = {}
 		for _, t in ipairs(self.types) do
-			table.insert(strings, tostring(t))
+			table.insert(strings, t:sub_visited(visited))
 		end
 		table.sort(strings)
 		return string.format("[%s]", table.concat(strings, " & "))
@@ -840,8 +849,17 @@ do -- Literal
 		return subset.value == superset.value
 	end
 
-	function LiteralInst:__tostring()
-		return string.format('"%s: %s"', tostring(self.value), tostring(self.ops))
+	function LiteralInst:__tostring(visited)
+		visited = visited or { n = 0 }
+		if self.ops then
+			return string.format(
+				'"%s: %s"',
+				self.value,
+				self.ops:sub_visited(visited)
+			)
+		else
+			return string.format('"%s"', self.value)
+		end
 	end
 end
 
