@@ -82,6 +82,9 @@ local function is_subset(subset, superset)
 	-- If both types have the same class, their respective compare method is
 	-- used. Otherwise, coerce the types to something else and compare that?
 
+	subset = subset:unify()
+	superset = superset:unify()
+
 	---@diagnostic disable-next-line: undefined-field, need-check-nil
 	while subset.__class == LazyRef and subset.value do
 		---@cast subset type-track.LazyRef
@@ -95,8 +98,6 @@ local function is_subset(subset, superset)
 		superset = superset.value
 	end
 	---@cast superset type-track.Type
-	subset = subset:unify()
-	superset = superset:unify()
 
 	if subset == Never or superset == Unknown then
 		return true
