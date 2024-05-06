@@ -731,20 +731,15 @@ do -- Intersection
 		for _, type in ipairs(self.types) do
 			local returns = type:eval(op, params)
 			if returns then
-				table.insert(all_returns)
+				table.insert(all_returns, returns)
 			end
 		end
 
 		if #all_returns == 0 then
-			-- all_returns may be empty
 			return nil
 		elseif #all_returns == 1 then
-			-- if we get here, at least one call succeeded
-			-- if only one call succeeded, return just that
 			return all_returns[1]
 		else
-			-- if we get here, at least two calls succeeded
-			-- I suppose just return an intersection of the returns
 			return Intersection(all_returns)
 		end
 	end
