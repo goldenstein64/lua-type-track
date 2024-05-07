@@ -68,12 +68,13 @@ local Never
 ---a = b
 ---```
 ---
----The constructor takes a `result_of` and `params_of` argument.
+---The constructor takes a `derive_fn` and `infer_fn` argument.
 ---
----- `result_of` takes its type parameters and returns its usage.
+---- `derive_fn` takes its type parameters and returns its parameters and
+---  returns.
 ---
----- `params_of` takes the parameters from its usage and returns its type
----  parameters.
+---- `infer_fn` takes the parameters and possible returns from its usage and
+---  returns the type parameters it inferred.
 ---
 ---Example:
 ---
@@ -88,7 +89,9 @@ local Never
 ---    return Tuple({T, T}), T + _nil
 ---  end,
 ---  function(params, returns) -- infer
----    return params:at(1)
+---    local T1, T2 = params:at(1), params:at(2)
+---    local T3 = returns:at(1) - _nil -- not implemented lol
+---    return T1 * T2 * T3
 ---  end
 ---)
 ---```
@@ -222,7 +225,7 @@ local function is_subset(subset, superset)
 	elseif sub_cls == Union then
 		---@cast subset type-track.Union
 		---@cast superset type-track.Operator | type-track.Literal
-		-- the use cases for this are not significant either
+		-- the use cases for this are not significant
 		return all_are_subset(subset.types, superset)
 	elseif sub_cls == Intersection then
 		---@cast subset type-track.Intersection
@@ -1161,6 +1164,8 @@ do -- Unknown
 	local UnknownClass = muun("Unknown", Type) --[[@as type-track.Unknown.Class]]
 
 	---@class type-track.Unknown : type-track.Type
+	---@operator mul(type-track.Type): type-track.Intersection
+	---@operator add(type-track.Type): type-track.Union
 	local UnknownInst = UnknownClass --[[@as type-track.Unknown]]
 
 	function UnknownInst:__tostring()
@@ -1185,6 +1190,8 @@ do -- Never
 	local NeverClass = muun("Never", Type)
 
 	---@class type-track.Never : type-track.Type
+	---@operator mul(type-track.Type): type-track.Intersection
+	---@operator add(type-track.Type): type-track.Union
 	local NeverInst = NeverClass --[[@as type-track.Never]]
 
 	function NeverInst:__tostring()
@@ -1213,10 +1220,13 @@ do -- GenericOperator
 	---@field op string
 	---@field derive_fn type-track.GenericOperator.derive_fn
 	---@field infer_fn type-track.GenericOperator.infer_fn
+	---@operator mul(type-track.Type): type-track.Intersection
+	---@operator add(type-track.Type): type-track.Union
 	local GenericOperatorInst = muun("GenericOperator", Type)
 
 	GenericOperator = GenericOperatorInst --[[@as type-track.GenericOperator.Class]]
 
+	---@param self type-track.GenericOperator
 	---@param op string
 	---@param derive_fn type-track.GenericOperator.derive_fn
 	---@param infer_fn type-track.GenericOperator.infer_fn
