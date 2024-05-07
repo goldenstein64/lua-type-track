@@ -101,16 +101,16 @@ local Never
 ---@overload fun(op: string, derive_fn: type-track.GenericOperator.derive_fn, infer_fn: type-track.GenericOperator.infer_fn): type-track.GenericOperator
 local GenericOperator
 
----@type fun(actual: type-track.Type, list: type-track.Type[], i?: integer, j?: integer): boolean
+---@type fun(subset: type-track.Type, superset_list: type-track.Type[], i?: integer, j?: integer): boolean
 local is_subset_of_any
 
----@type fun(actual: type-track.Type, list: type-track.Type[], i?: integer, j?: integer): boolean
+---@type fun(subset: type-track.Type, superset_list: type-track.Type[], i?: integer, j?: integer): boolean
 local is_subset_of_all
 
----@type fun(list: type-track.Type[], expected: type-track.Type, i?: integer, j?: integer): boolean
+---@type fun(subset_list: type-track.Type[], superset: type-track.Type, i?: integer, j?: integer): boolean
 local all_are_subset
 
----@type fun(list: type-track.Type[], expected: type-track.Type, i?: integer, j?: integer): boolean
+---@type fun(subset_list: type-track.Type[], superset: type-track.Type, i?: integer, j?: integer): boolean
 local any_are_subset
 
 ---determines whether `subset` is a subset of `superset`
@@ -246,16 +246,16 @@ local function is_subset(subset, superset)
 	return false
 end
 
----accepts a type `actual` if it is a subset of all types in `list`
----@param actual type-track.Type
----@param list type-track.Type[]
+---accepts a type `subset` if it is a subset of all types in `superset_list`
+---@param subset type-track.Type
+---@param superset_list type-track.Type[]
 ---@param i? integer
 ---@param j? integer
 ---@return boolean
-function is_subset_of_all(actual, list, i, j)
-	for k = i or 1, j or #list do
-		local expected = list[k]
-		if not is_subset(actual, expected) then
+function is_subset_of_all(subset, superset_list, i, j)
+	for k = i or 1, j or #superset_list do
+		local expected = superset_list[k]
+		if not is_subset(subset, expected) then
 			return false
 		end
 	end
@@ -263,16 +263,16 @@ function is_subset_of_all(actual, list, i, j)
 	return true
 end
 
----accepts a type `actual` if it is a subset of any type in `list`
----@param actual type-track.Type
----@param list type-track.Type[]
+---accepts a type `subset` if it is a subset of any type in `superset_list`
+---@param subset type-track.Type
+---@param superset_list type-track.Type[]
 ---@param i? integer
 ---@param j? integer
 ---@return boolean
-function is_subset_of_any(actual, list, i, j)
-	for k = i or 1, j or #list do
-		local expected = list[k]
-		if is_subset(actual, expected) then
+function is_subset_of_any(subset, superset_list, i, j)
+	for k = i or 1, j or #superset_list do
+		local expected = superset_list[k]
+		if is_subset(subset, expected) then
 			return true
 		end
 	end
@@ -280,15 +280,16 @@ function is_subset_of_any(actual, list, i, j)
 	return false
 end
 
----@param list type-track.Type[]
----@param expected type-track.Type
+---accepts a type `superset` if it is a superset of all types in `subset_list`
+---@param subset_list type-track.Type[]
+---@param superset type-track.Type
 ---@param i? integer
 ---@param j? integer
 ---@return boolean
-function all_are_subset(list, expected, i, j)
-	for k = i or 1, j or #list do
-		local actual = list[k]
-		if not is_subset(actual, expected) then
+function all_are_subset(subset_list, superset, i, j)
+	for k = i or 1, j or #subset_list do
+		local actual = subset_list[k]
+		if not is_subset(actual, superset) then
 			return false
 		end
 	end
@@ -296,15 +297,16 @@ function all_are_subset(list, expected, i, j)
 	return true
 end
 
----@param list type-track.Type[]
----@param expected type-track.Type
+---accepts a type `superset` if it is a superset of any type in `subset_list`
+---@param subset_list type-track.Type[]
+---@param superset type-track.Type
 ---@param i? integer
 ---@param j? integer
 ---@return boolean
-function any_are_subset(list, expected, i, j)
-	for k = i or 1, j or #list do
-		local actual = list[k]
-		if is_subset(actual, expected) then
+function any_are_subset(subset_list, superset, i, j)
+	for k = i or 1, j or #subset_list do
+		local actual = subset_list[k]
+		if is_subset(actual, superset) then
 			return true
 		end
 	end
