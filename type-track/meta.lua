@@ -495,6 +495,81 @@ do -- Type
 	end
 end
 
+do -- Operator
+	---represents a possible operation on a value, e.g. addition, concatenation,
+	---etc.
+	---@class type-track.Operator : type-track.Type
+	---@field params type-track.Type
+	---@field returns type-track.Type
+	---@field op string
+	---@operator mul(type-track.Type): type-track.Intersection
+	---@operator add(type-track.Type): type-track.Union
+	local OperatorInst = muun("Operator", Type)
+
+	Operator = OperatorInst --[[@as type-track.Operator.Class]]
+
+	---@param self type-track.Operator
+	---@param op string
+	---@param params type-track.Type
+	---@param returns type-track.Type
+	function Operator:new(op, params, returns)
+		self.params = params
+		self.returns = returns
+		self.op = op
+	end
+
+	---@param subset type-track.Operator
+	---@param superset type-track.Operator
+	---@return boolean
+	function Operator.is_subset(subset, superset)
+		return subset.op == superset.op
+			and is_subset(subset.params, superset.params)
+			and is_subset(superset.returns, subset.returns)
+	end
+
+	---@param op string
+	---@param params type-track.Type
+	---@return type-track.Type? returns
+	function OperatorInst:eval(op, params)
+		if op ~= self.op then
+			return nil
+		end
+
+		if is_subset(params, self.params) then
+			return self.returns
+		else
+			return nil
+		end
+	end
+
+	---@param op string
+	---@return type-track.Type? params
+	function OperatorInst:get_params(op)
+		if op == self.op then
+			return self.params
+		else
+			return nil
+		end
+	end
+
+	function OperatorInst:_unify()
+		return Operator(self.op, self.params:unify(), self.returns:unify())
+	end
+
+	---@param visited { [type-track.Type]: number?, n: number }
+	---@return string
+	function OperatorInst:__tostring(visited)
+		visited = visited or { n = 0 }
+
+		return string.format(
+			"{ %s: %s -> %s }",
+			self.op,
+			self.params:sub_visited(visited),
+			self.returns:sub_visited(visited)
+		)
+	end
+end
+
 do -- Tuple
 	---@class type-track.Tuple : type-track.Type
 	---@field types type-track.Type[]
@@ -635,81 +710,6 @@ do -- Tuple
 		end
 
 		return string.format("(%s)", table.concat(strings, ", "))
-	end
-end
-
-do -- Operator
-	---represents a possible operation on a value, e.g. addition, concatenation,
-	---etc.
-	---@class type-track.Operator : type-track.Type
-	---@field params type-track.Type
-	---@field returns type-track.Type
-	---@field op string
-	---@operator mul(type-track.Type): type-track.Intersection
-	---@operator add(type-track.Type): type-track.Union
-	local OperatorInst = muun("Operator", Type)
-
-	Operator = OperatorInst --[[@as type-track.Operator.Class]]
-
-	---@param self type-track.Operator
-	---@param op string
-	---@param params type-track.Type
-	---@param returns type-track.Type
-	function Operator:new(op, params, returns)
-		self.params = params
-		self.returns = returns
-		self.op = op
-	end
-
-	---@param subset type-track.Operator
-	---@param superset type-track.Operator
-	---@return boolean
-	function Operator.is_subset(subset, superset)
-		return subset.op == superset.op
-			and is_subset(subset.params, superset.params)
-			and is_subset(superset.returns, subset.returns)
-	end
-
-	---@param op string
-	---@param params type-track.Type
-	---@return type-track.Type? returns
-	function OperatorInst:eval(op, params)
-		if op ~= self.op then
-			return nil
-		end
-
-		if is_subset(params, self.params) then
-			return self.returns
-		else
-			return nil
-		end
-	end
-
-	---@param op string
-	---@return type-track.Type? params
-	function OperatorInst:get_params(op)
-		if op == self.op then
-			return self.params
-		else
-			return nil
-		end
-	end
-
-	function OperatorInst:_unify()
-		return Operator(self.op, self.params:unify(), self.returns:unify())
-	end
-
-	---@param visited { [type-track.Type]: number?, n: number }
-	---@return string
-	function OperatorInst:__tostring(visited)
-		visited = visited or { n = 0 }
-
-		return string.format(
-			"{ %s: %s -> %s }",
-			self.op,
-			self.params:sub_visited(visited),
-			self.returns:sub_visited(visited)
-		)
 	end
 end
 
