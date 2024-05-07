@@ -113,8 +113,7 @@ local all_are_subset
 ---@type fun(list: type-track.Type[], expected: type-track.Type, i?: integer, j?: integer): boolean
 local any_are_subset
 
----determines whether `subtype` is a subset of `supertype`. This operation is
----supported for every type in this file.
+---determines whether `subset` is a subset of `superset`
 ---
 ---It is essentially a test to see if this assignment passes:
 ---
@@ -1314,11 +1313,14 @@ do -- GenericOperator
 		return Operator(self.op, self_params, self_returns)
 	end
 
-	---@param visited { [type-track.Type]: true? }
+	---@param visited { [type-track.Type]: number?, n: number }
 	function GenericOperatorInst:__tostring(visited)
 		visited = visited or { n = 0 }
-		visited[self] = true
-		return string.format("{ %s(): %s }", self.op, self.derive_fn(unknown_var))
+		return string.format(
+			"{ %s(): %s }",
+			self.op,
+			self.derive_fn(unknown_var):sub_visited(visited)
+		)
 	end
 end
 
