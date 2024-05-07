@@ -1084,7 +1084,16 @@ do -- Literal
 	---@param superset type-track.Literal
 	---@return boolean
 	function Literal.is_subset(subset, superset)
-		return subset.value == superset.value
+		if subset.value ~= superset.value then
+			return false
+		end
+
+		local subset_ops, superset_ops = subset.ops, superset.ops
+		if subset_ops and superset_ops then
+			return is_subset(subset_ops, superset_ops)
+		else
+			return not subset_ops and not superset_ops
+		end
 	end
 
 	---@param op string
