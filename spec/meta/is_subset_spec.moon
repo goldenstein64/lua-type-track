@@ -80,10 +80,13 @@ describe 'is_subset', ->
 		assert.is_true is_subset type1, type2
 
 	it 'accepts A & B <: (A & B) | (A & C)', ->
-		type1 = (A * B)
-		type2 = ((A * B) + (A * C))
+		assert.is_true is_subset A * B, (A * B) + (A * C)
 
-		assert.is_true is_subset type1, type2
+	it 'rejects A & B <: B & C', ->
+		assert.is_false is_subset A * B, B * C
+
+	it 'rejects B & C <: A & B', ->
+		assert.is_false is_subset B * C, A * B
 
 	describe 'when compared up to tuples', ->
 		it 'accepts anything compared to zero elements', ->
