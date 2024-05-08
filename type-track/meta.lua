@@ -233,10 +233,7 @@ local function is_subset(subset, superset)
 	elseif sub_cls == Literal then
 		---@cast subset type-track.Literal
 		---@cast superset type-track.Operator
-		local subset_ops = subset.ops
-		if subset_ops then
-			return is_subset(subset_ops, superset)
-		end
+		return is_subset(subset.ops, superset)
 	elseif sub_cls == Operator then
 		---@cast subset type-track.Operator
 		---@cast superset type-track.Literal
@@ -1067,7 +1064,7 @@ end
 do -- Literal
 	---@class type-track.Literal : type-track.Type
 	---@field value unknown
-	---@field ops type-track.Type?
+	---@field ops type-track.Type
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator add(type-track.Type): type-track.Union
 	local LiteralInst = muun("Literal", Type)
@@ -1079,47 +1076,27 @@ do -- Literal
 	---@param ops? type-track.Type
 	function Literal:new(value, ops)
 		self.value = value
-		self.ops = ops
+		self.ops = ops or Unknown
 	end
 
 	---@param subset type-track.Literal
 	---@param superset type-track.Literal
 	---@return boolean
 	function Literal.is_subset(subset, superset)
-		if subset.value ~= superset.value then
-			return false
-		end
-
-		local subset_ops, superset_ops = subset.ops, superset.ops
-		if subset_ops and superset_ops then
-			return is_subset(subset_ops, superset_ops)
-		else
-			return not subset_ops and not superset_ops
-		end
+		return subset.value == superset.value
+			and is_subset(subset.ops, superset.ops)
 	end
 
 	---@param op string
 	---@param params type-track.Type
 	---@return type-track.Type? returns
 	function Literal:eval(op, params)
-		if self.ops then
-			return self.ops:eval(op, params)
-		else
-			return nil
-		end
+		return self.ops:eval(op, params)
 	end
 
 	function LiteralInst:__tostring(visited)
 		visited = visited or { n = 0 }
-		if self.ops then
-			return string.format(
-				'"%s: %s"',
-				self.value,
-				self.ops:sub_visited(visited)
-			)
-		else
-			return string.format('"%s"', self.value)
-		end
+		return string.format('"%s: %s"', self.value, self.ops:sub_visited(visited))
 	end
 end
 
