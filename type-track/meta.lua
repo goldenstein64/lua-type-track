@@ -340,7 +340,7 @@ do -- Type
 	---If `nil` is returned, the operation isn't compatible. Otherwise, a type is
 	---returned. A `Tuple` is used for multiple parameter types.
 	---@param op string
-	---@return type-track.Type?
+	---@return type-track.Type? domain
 	function TypeInst:get_domain(op)
 		return nil
 	end
@@ -348,7 +348,7 @@ do -- Type
 	---returns the `i`th element in this type
 	---
 	---This implementation is typically moot for types of a single value, like
-	---`Callable` or `Object`, but useful for `Tuple`s or `Tuple`-containing
+	---`Operator` or `Literal`, but useful for `Tuple`s or `Tuple`-containing
 	---types.
 	---@param i integer
 	---@return type-track.Type?
@@ -356,7 +356,7 @@ do -- Type
 		return i == 1 and self or Tuple.default_var_arg
 	end
 
-	---converts a type into its simplest form. It always returns a new Type.
+	---converts a type into its simplest form. It always returns a new `Type`.
 	---
 	---Note: If you plan to change the behavior of this method, override
 	---`Type:_unify()`.
