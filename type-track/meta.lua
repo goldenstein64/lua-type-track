@@ -1094,6 +1094,12 @@ do -- Literal
 		return self.ops:eval(op, domain)
 	end
 
+	---@param op string
+	---@return type-track.Type? domain
+	function Literal:get_domain(op)
+		return self.ops:get_domain(op)
+	end
+
 	function LiteralInst:__tostring(visited)
 		visited = visited or { n = 0 }
 		return string.format('"%s: %s"', self.value, self.ops:sub_visited(visited))
