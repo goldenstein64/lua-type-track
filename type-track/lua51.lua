@@ -417,7 +417,7 @@ local debuglib = lib({
 			return nil
 		end
 
-		local func_params = func_arg:get_params("call")
+		local func_params = func_arg:get_domain("call")
 		if func_params then
 			local func_returns = func_arg:eval("call", func_params)
 			if func_returns then

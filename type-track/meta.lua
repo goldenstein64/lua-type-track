@@ -13,7 +13,7 @@ local Tuple
 
 ---the base structural type
 ---@class type-track.Operator.Class
----@overload fun(op: string, params: type-track.Type, returns: type-track.Type): type-track.Operator
+---@overload fun(op: string, domain: type-track.Type, range: type-track.Type): type-track.Operator
 local Operator
 
 ---an aggregation declaring at least one type lives in its value
@@ -52,8 +52,8 @@ local unknown_var
 ---@type type-track.Never
 local Never
 
----@alias type-track.GenericOperator.derive_fn fun(type_params: type-track.Type): (params: type-track.Type?, returns: type-track.Type?)
----@alias type-track.GenericOperator.infer_fn fun(params: type-track.Type, returns: type-track.Type?): (type_params: type-track.Type?)
+---@alias type-track.GenericOperator.derive_fn fun(type_params: type-track.Type): (domain: type-track.Type?, range: type-track.Type?)
+---@alias type-track.GenericOperator.infer_fn fun(domain: type-track.Type, range: type-track.Type?): (type_params: type-track.Type?)
 
 ---an operator that captures its types on usage
 ---
@@ -70,10 +70,10 @@ local Never
 ---
 ---The constructor takes a `derive_fn` and `infer_fn` argument.
 ---
----- `derive_fn` takes its type parameters and returns its parameters and
----  returns.
+---- `derive_fn` takes its type parameters and returns its domain and
+---  range.
 ---
----- `infer_fn` takes the parameters and possible returns from its usage and
+---- `infer_fn` takes the domain and possible range from its usage and
 ---  returns the type parameters it inferred.
 ---
 ---Example:
@@ -88,9 +88,9 @@ local Never
 ---
 ---    return Tuple({T, T}), T + _nil
 ---  end,
----  function(params, returns) -- infer
----    local T1, T2 = params:at(1), params:at(2)
----    local T3 = returns:at(1) - _nil -- not implemented lol
+---  function(domain, range) -- infer
+---    local T1, T2 = domain:at(1), domain:at(2)
+---    local T3 = range:at(1) - _nil -- not implemented lol
 ---    return T1 * T2 * T3
 ---  end
 ---)
@@ -324,14 +324,14 @@ do -- Type
 		return false
 	end
 
-	---attempts to evaluate `op` on this type with `params`
+	---attempts to evaluate `op` on this type with `domain`
 	---
 	---If `nil` is returned, the operation wasn't compatible. Otherwise, a type
 	---is returned. A `Tuple` is used for multiple return types.
 	---@param op string
-	---@param params type-track.Type
-	---@return type-track.Type? returns
-	function TypeInst:eval(op, params)
+	---@param domain type-track.Type
+	---@return type-track.Type? range
+	function TypeInst:eval(op, domain)
 		error("not implemented")
 	end
 
@@ -341,7 +341,7 @@ do -- Type
 	---returned. A `Tuple` is used for multiple parameter types.
 	---@param op string
 	---@return type-track.Type?
-	function TypeInst:get_params(op)
+	function TypeInst:get_domain(op)
 		return nil
 	end
 
@@ -498,8 +498,8 @@ do -- Operator
 	---represents a possible operation on a value, e.g. addition, concatenation,
 	---etc.
 	---@class type-track.Operator : type-track.Type
-	---@field params type-track.Type
-	---@field returns type-track.Type
+	---@field domain type-track.Type
+	---@field range type-track.Type
 	---@field op string
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator add(type-track.Type): type-track.Union
@@ -509,11 +509,11 @@ do -- Operator
 
 	---@param self type-track.Operator
 	---@param op string
-	---@param params type-track.Type
-	---@param returns type-track.Type
-	function Operator:new(op, params, returns)
-		self.params = params
-		self.returns = returns
+	---@param domain type-track.Type
+	---@param range type-track.Type
+	function Operator:new(op, domain, range)
+		self.domain = domain
+		self.range = range
 		self.op = op
 	end
 
@@ -522,37 +522,37 @@ do -- Operator
 	---@return boolean
 	function Operator.is_subset(subset, superset)
 		return subset.op == superset.op
-			and is_subset(subset.params, superset.params)
-			and is_subset(superset.returns, subset.returns)
+			and is_subset(subset.domain, superset.domain)
+			and is_subset(superset.range, subset.range)
 	end
 
 	---@param op string
-	---@param params type-track.Type
-	---@return type-track.Type? returns
-	function OperatorInst:eval(op, params)
+	---@param domain type-track.Type
+	---@return type-track.Type? range
+	function OperatorInst:eval(op, domain)
 		if op ~= self.op then
 			return nil
 		end
 
-		if is_subset(params, self.params) then
-			return self.returns
+		if is_subset(domain, self.domain) then
+			return self.range
 		else
 			return nil
 		end
 	end
 
 	---@param op string
-	---@return type-track.Type? params
-	function OperatorInst:get_params(op)
+	---@return type-track.Type? domain
+	function OperatorInst:get_domain(op)
 		if op == self.op then
-			return self.params
+			return self.domain
 		else
 			return nil
 		end
 	end
 
 	function OperatorInst:_unify()
-		return Operator(self.op, self.params:unify(), self.returns:unify())
+		return Operator(self.op, self.domain:unify(), self.range:unify())
 	end
 
 	---@param visited { [type-track.Type]: number?, n: number }
@@ -563,8 +563,8 @@ do -- Operator
 		return string.format(
 			"{ %s: %s -> %s }",
 			self.op,
-			self.params:sub_visited(visited),
-			self.returns:sub_visited(visited)
+			self.domain:sub_visited(visited),
+			self.range:sub_visited(visited)
 		)
 	end
 end
@@ -655,23 +655,23 @@ do -- Tuple
 	end
 
 	---@param op string
-	---@param params type-track.Type
-	---@return type-track.Type? returns
-	function TupleInst:eval(op, params)
+	---@param domain type-track.Type
+	---@return type-track.Type? range
+	function TupleInst:eval(op, domain)
 		local first_elem = self:at(1)
 		if first_elem then
-			return first_elem:eval(op, params)
+			return first_elem:eval(op, domain)
 		else
 			return nil
 		end
 	end
 
 	---@param op string
-	---@return type-track.Type?
-	function TupleInst:get_params(op)
+	---@return type-track.Type? domain
+	function TupleInst:get_domain(op)
 		local first_elem = self:at(1)
 		if first_elem then
-			return first_elem:get_params(op)
+			return first_elem:get_domain(op)
 		else
 			return nil
 		end
@@ -753,42 +753,42 @@ do -- Union
 	end
 
 	---@param op string
-	---@param params type-track.Type
-	---@return type-track.Type? returns
-	function UnionInst:eval(op, params)
+	---@param domain type-track.Type
+	---@return type-track.Type? range
+	function UnionInst:eval(op, domain)
 		---@type type-track.Type[]
-		local all_returns = {}
+		local all_ranges = {}
 
 		-- if any element doesn't support it, the entire union doesn't support it
 		for _, type in ipairs(self.types) do
-			local returns = type:eval(op, params)
-			if returns then
-				table.insert(all_returns, returns)
+			local range = type:eval(op, domain)
+			if range then
+				table.insert(all_ranges, range)
 			else
 				return nil
 			end
 		end
 
-		assert(#all_returns >= 2, "evaluation on union did not have enough types")
-		return Union(all_returns)
+		assert(#all_ranges >= 2, "evaluation on union did not have enough types")
+		return Union(all_ranges)
 	end
 
 	---@param op string
 	---@return type-track.Type?
-	function UnionInst:get_params(op)
+	function UnionInst:get_domain(op)
 		---@type type-track.Type[]
-		local all_params = {}
+		local all_domains = {}
 		for _, type in ipairs(self.types) do
-			local params = type:get_params(op)
-			if params then
-				table.insert(all_params, params)
+			local domain = type:get_domain(op)
+			if domain then
+				table.insert(all_domains, domain)
 			else
 				return nil
 			end
 		end
 
-		assert(#all_params >= 2)
-		return Intersection(all_params)
+		assert(#all_domains >= 2)
+		return Intersection(all_domains)
 	end
 
 	---@param types type-track.Type[]
@@ -893,47 +893,47 @@ do -- Intersection
 	end
 
 	---@param op string
-	---@param params type-track.Type
-	---@return type-track.Type? returns
-	function IntersectionInst:eval(op, params)
+	---@param domain type-track.Type
+	---@return type-track.Type? range
+	function IntersectionInst:eval(op, domain)
 		---@type type-track.Type[]
-		local all_returns = {}
+		local all_ranges = {}
 
 		-- it's okay if some calls are not supported here
 		for _, type in ipairs(self.types) do
-			local returns = type:eval(op, params)
-			if returns then
-				table.insert(all_returns, returns)
+			local range = type:eval(op, domain)
+			if range then
+				table.insert(all_ranges, range)
 			end
 		end
 
-		if #all_returns == 0 then
+		if #all_ranges == 0 then
 			return nil
-		elseif #all_returns == 1 then
-			return all_returns[1]
+		elseif #all_ranges == 1 then
+			return all_ranges[1]
 		else
-			return Intersection(all_returns)
+			return Intersection(all_ranges)
 		end
 	end
 
 	---@param op string
-	---@return type-track.Type?
-	function IntersectionInst:get_params(op)
+	---@return type-track.Type? domain
+	function IntersectionInst:get_domain(op)
 		---@type type-track.Type[]
-		local all_params = {}
+		local all_domains = {}
 		for _, type in ipairs(self.types) do
-			local params = type:get_params(op)
-			if params then
-				table.insert(all_params, params)
+			local domain = type:get_domain(op)
+			if domain then
+				table.insert(all_domains, domain)
 			end
 		end
 
-		if #all_params == 0 then
+		if #all_domains == 0 then
 			return nil
-		elseif #all_params == 1 then
-			return all_params[1]
+		elseif #all_domains == 1 then
+			return all_domains[1]
 		else
-			return Union(all_params)
+			return Union(all_domains)
 		end
 	end
 
@@ -1088,10 +1088,10 @@ do -- Literal
 	end
 
 	---@param op string
-	---@param params type-track.Type
-	---@return type-track.Type? returns
-	function Literal:eval(op, params)
-		return self.ops:eval(op, params)
+	---@param domain type-track.Type
+	---@return type-track.Type? range
+	function Literal:eval(op, domain)
+		return self.ops:eval(op, domain)
 	end
 
 	function LiteralInst:__tostring(visited)
@@ -1120,14 +1120,14 @@ do -- Free
 		end
 	end
 
-	---@return type-track.Type? returns
+	---@return type-track.Type? range
 	function FreeInst:eval(...)
 		return self:unwrap():eval(...)
 	end
 
 	---@return type-track.Type?
-	function FreeInst:get_params(...)
-		return self:unwrap():get_params(...)
+	function FreeInst:get_domain(...)
+		return self:unwrap():get_domain(...)
 	end
 
 	---@return type-track.Type?
@@ -1161,9 +1161,9 @@ do -- Unknown
 
 	---Evaluations are never valid on `Unknown`.
 	---@param op string
-	---@param params type-track.Type
-	---@return type-track.Type? returns
-	function UnknownInst:eval(op, params)
+	---@param domain type-track.Type
+	---@return type-track.Type? range
+	function UnknownInst:eval(op, domain)
 		return nil
 	end
 
@@ -1185,11 +1185,11 @@ do -- Never
 		return "never"
 	end
 
-	---Evaluations are always valid on `Never` and returns itself.
+	---Evaluations are always valid on `Never` and return itself.
 	---@param op string
-	---@param params type-track.Type
-	---@return type-track.Type? returns
-	function NeverInst:eval(op, params)
+	---@param domain type-track.Type
+	---@return type-track.Type? range
+	function NeverInst:eval(op, domain)
 		return Never
 	end
 
@@ -1227,51 +1227,51 @@ do -- GenericOperator
 	---@param superset type-track.GenericOperator
 	---@return boolean
 	function GenericOperator.is_subset(subset, superset)
-		local subset_params, subset_returns = subset.derive_fn(unknown_var)
-		if not subset_params or not subset_returns then
+		local subset_domain, subset_range = subset.derive_fn(unknown_var)
+		if not subset_domain or not subset_range then
 			return false
 		end
 
-		local superset_params, superset_returns = superset.derive_fn(unknown_var)
-		if not superset_params or not superset_returns then
+		local superset_domain, superset_range = superset.derive_fn(unknown_var)
+		if not superset_domain or not superset_range then
 			return false
 		end
 
 		return subset.op == superset.op
-			and is_subset(subset_params, superset_params)
-			and is_subset(superset_returns, subset_returns)
+			and is_subset(subset_domain, superset_domain)
+			and is_subset(superset_range, subset_range)
 	end
 
 	---@param op string
-	---@param params type-track.Type
-	---@return type-track.Type?
-	function GenericOperatorInst:eval(op, params)
+	---@param domain type-track.Type
+	---@return type-track.Type? range
+	function GenericOperatorInst:eval(op, domain)
 		if op ~= self.op then
 			return nil
 		end
 
-		local type_params = self.infer_fn(params)
+		local type_params = self.infer_fn(domain)
 		if not type_params then
 			return nil
 		end
 
-		local self_params, self_returns = self.derive_fn(type_params)
-		if self_params and is_subset(params, self_params) then
-			return self_returns
+		local self_domain, self_range = self.derive_fn(type_params)
+		if self_domain and is_subset(domain, self_domain) then
+			return self_range
 		else
 			return nil
 		end
 	end
 
 	---@param op string
-	---@return type-track.Type?
-	function GenericOperatorInst:get_params(op)
+	---@return type-track.Type? domain
+	function GenericOperatorInst:get_domain(op)
 		if op ~= self.op then
 			return nil
 		end
 
-		local self_params = self.derive_fn(unknown_var)
-		return self_params
+		local self_domain = self.derive_fn(unknown_var)
+		return self_domain
 	end
 
 	---returns a concrete `Operator` that is a subset of `superset` for this
@@ -1282,23 +1282,23 @@ do -- GenericOperator
 	---@param superset type-track.Type
 	---@return type-track.Type? concrete
 	function GenericOperatorInst:match(superset)
-		local super_params = superset:get_params(self.op)
-		if not super_params then
+		local super_domain = superset:get_domain(self.op)
+		if not super_domain then
 			return nil
 		end
 
-		local super_returns = superset:eval(self.op, super_params)
-		local type_params = self.infer_fn(super_params, super_returns)
+		local super_range = superset:eval(self.op, super_domain)
+		local type_params = self.infer_fn(super_domain, super_range)
 		if not type_params then
 			return nil
 		end
 
-		local self_params, self_returns = self.derive_fn(type_params)
-		if not self_params then
+		local self_domain, self_range = self.derive_fn(type_params)
+		if not self_domain then
 			return nil
 		end
 
-		return Operator(self.op, self_params, self_returns)
+		return Operator(self.op, self_domain, self_range)
 	end
 
 	---@param visited { [type-track.Type]: number?, n: number }

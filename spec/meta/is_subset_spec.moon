@@ -30,7 +30,7 @@ describe 'is_subset', ->
 
 				T, empty
 
-			(params) -> params\at 1
+			(domain) -> domain\at 1
 		)
 
 		assert.is_true is_subset type1, type2
@@ -45,7 +45,7 @@ describe 'is_subset', ->
 
 				empty, T
 
-			(params, returns) -> returns\at 1
+			(domain, range) -> range\at 1
 		)
 
 		assert.is_true is_subset type2, type1
@@ -60,7 +60,7 @@ describe 'is_subset', ->
 
 				T, T
 
-			(params) -> params\at 1
+			(domain) -> domain\at 1
 		)
 
 		-- _G.DEBUG = true

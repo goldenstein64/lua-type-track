@@ -17,7 +17,7 @@ describe 'GenericOperator', ->
 					T = type_params\at 1
 					T, T
 
-				(params) -> params\at 1
+				(domain) -> domain\at 1
 			)
 
 			type2 = GenericOperator(
@@ -26,7 +26,7 @@ describe 'GenericOperator', ->
 					U = type_params\at 1
 					U, U
 
-				(params) -> params\at 1
+				(domain) -> domain\at 1
 			)
 
 			assert.is_true GenericOperator.is_subset type1, type2
@@ -39,7 +39,7 @@ describe 'GenericOperator', ->
 					T = type_params\at 1
 					T, T + A
 
-				(params) -> params\at 1
+				(domain) -> domain\at 1
 			)
 
 			type2 = GenericOperator(
@@ -48,7 +48,7 @@ describe 'GenericOperator', ->
 					U = type_params\at 1
 					U, U + A
 
-				(params) -> params\at 1
+				(domain) -> domain\at 1
 			)
 
 			assert.is_true GenericOperator.is_subset type1, type2
