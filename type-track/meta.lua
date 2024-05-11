@@ -126,15 +126,6 @@ local any_are_subset
 ---@param superset type-track.Type
 ---@return boolean
 local function is_subset(subset, superset)
-	-- Tuple, Union, Intersection, Operator, Literal
-	-- 25 combinations
-	-- sub-super
-	-- TT TU TI TO TL
-	-- UT UU UI UO UL
-	-- IT IU II IO IL
-	-- OT OU OI OO OL
-	-- LT LU LI LO LL
-	--
 	-- If both types have the same class, their respective compare method is
 	-- used. Otherwise, coerce the types to something else and compare that?
 
