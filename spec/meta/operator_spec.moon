@@ -1,47 +1,71 @@
-import Type, Operator, Tuple, Literal from require 'type-track.meta'
+import
+	Type, Operator, Tuple, Literal, Never, Unknown
+	Intersection, is_subset
+from require 'type-track.meta'
 
-describe 'callable', ->
+describe 'Operator', ->
 	A = Literal 'A'
 	B = Literal 'B'
 	C = Literal 'C'
-	True = Literal true
 
-	never = Tuple {}
 	AB = Tuple { A, B }
 	ABC = Tuple { A, B, C } -- ABC\is_subset AB
+	assert.is_true is_subset ABC, AB
 
 	it 'is a Type', ->
-		func = Operator never, never
+		func = Operator Never, Never
 
 		assert.is_true func\is_instance Type
 
 	describe 'is_subset', ->
-		it 'accepts an operator with a subset of args', ->
-			func2 = Operator 'call', AB, never
-			func3 = Operator 'call', ABC, never
-			-- if func2 is called with args ABC, it would discard the C and unify
+		it 'accepts (...A) -> () <: (A, A, A) -> () but not converse', ->
+			-- long: (A, A, A) -> ()
+			-- var: (...A) -> ()
+			--
+			-- var = long -- if this was accepted, then
+			-- var(A) -- this would be acceptable, but it's not
+			long_tup = Operator 'call', (Tuple { A, A, A }), Never
+			var_tup = Operator 'call', (Tuple {}, A), Never
 
-			assert.is_true Operator.is_subset func3, func2
-			assert.is_false Operator.is_subset func2, func3
+			assert.is_true Operator.is_subset var_tup, long_tup
+			assert.is_false Operator.is_subset long_tup, var_tup
 
-		it 'accepts an operator with a superset of returns', ->
-			func2 = Operator 'call', never, AB
-			func3 = Operator 'call', never, ABC
-			-- if the call site only expects AB, then it doesn't matter whether AB or ABC is returned
+		it 'accepts (A, B) -> () <: (A, B, C) -> () but not converse', ->
+			-- funcAB: (A, B) -> ()
+			-- funcABC: (A, B, C) -> ()
+			--
+			-- funcAB = funcABC -- if this was accepted
+			-- funcAB(A, B) -- this would be acceptable, but it's not
+			funcAB = Operator 'call', AB, Never
+			funcABC = Operator 'call', ABC, Never
 
-			assert.is_true Operator.is_subset func2, func3
-			assert.is_false Operator.is_subset func3, func2
+			assert.is_true is_subset ABC, AB
+			assert.is_true Operator.is_subset funcAB, funcABC
+			assert.is_false Operator.is_subset funcABC, funcAB
 
-		it 'accepts an operator with a subset of args and a superset of returns', ->
+		it 'accepts () -> (A, B, C) <: () -> (A, B) but not converse', ->
+			-- funcAB: () -> (A, B)
+			-- funcABC: () -> (A, B, C)
+			--
+			-- funcABC = funcAB -- if this was accepted,
+			-- A, B, C = funcABC() -- this would be acceptable, but it's not
+			funcAB = Operator 'call', Never, AB
+			funcABC = Operator 'call', Never, ABC
+
+			assert.is_true is_subset ABC, AB
+			assert.is_true Operator.is_subset funcABC, funcAB
+			assert.is_false Operator.is_subset funcAB, funcABC
+
+		it 'accepts (A, B) -> (A, B, C) <: (A, B, C) -> (A, B) but not converse', ->
 			func23 = Operator 'call', AB, ABC
 			func32 = Operator 'call', ABC, AB
 
-			assert.is_true Operator.is_subset func32, func23
-			assert.is_false Operator.is_subset func23, func32
+			assert.is_true Operator.is_subset func23, func32
+			assert.is_false Operator.is_subset func32, func23
 
 	describe 'eval', ->
 		it 'gives nil when given no arguments', ->
-			func = Operator 'call', never, ABC
+			func = Operator 'call', Never, ABC
 
 			assert._nil func\eval!
 
@@ -54,6 +78,6 @@ describe 'callable', ->
 		it 'gives nil when given an incompatible param type', ->
 			func = Operator 'call', AB, ABC
 
-			assert.is_nil func\eval 'call', never
+			assert.is_nil func\eval 'call', Unknown
 			assert.is_nil func\eval 'call', A
 			assert.is_nil func\eval 'call', Tuple { A }

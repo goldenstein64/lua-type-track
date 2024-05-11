@@ -134,12 +134,20 @@ local function is_subset(subset, superset)
 	-- IT IU II IO IL
 	-- OT OU OI OO OL
 	-- LT LU LI LO LL
-
+	--
 	-- If both types have the same class, their respective compare method is
 	-- used. Otherwise, coerce the types to something else and compare that?
 
+	if rawequal(subset, superset) then
+		return true
+	end
+
 	subset = subset:unify()
 	superset = superset:unify()
+
+	if rawequal(subset, superset) then
+		return true
+	end
 
 	while true do
 		local sub_cls = subset.__class
@@ -320,6 +328,29 @@ do -- Type
 
 	Type = TypeInst --[[@as type-track.Type.Class]]
 
+	---determines whether `subset` is a subset of `superset`, where both types
+	---are of the same class
+	---
+	---Generally, based on its element relationship:
+	---- Covariance - every element of `subset` must be a subset of its
+	---  corresponding element in `superset`
+	---- Contravariance - every element in `superset` must be a subset of its
+	---  corresponding element in `subset`
+	---- Invariance - every element in `subset` must be equal to its
+	---  corresponding element in `superset`
+	---
+	---For each class:
+	---- `Operator`s have contravariant domains and covariant ranges
+	---- `Tuple`s have covariant elements
+	---- `Union`s have covariant elements
+	---- `Intersection`s have contravariant elements (?)
+	---- `Literal`s have invariant values and covariant supporting operators
+	---- `Free` types are covariant
+	---- `GenericOperator`s' variance are determined by their inference function
+	---- `Never` and `Unknown` are not parameterized
+	---@param subset type-track.Type
+	---@param superset type-track.Type
+	---@return boolean
 	function Type.is_subset(subset, superset)
 		return false
 	end
@@ -522,8 +553,8 @@ do -- Operator
 	---@return boolean
 	function Operator.is_subset(subset, superset)
 		return subset.op == superset.op
-			and is_subset(subset.domain, superset.domain)
-			and is_subset(superset.range, subset.range)
+			and is_subset(superset.domain, subset.domain)
+			and is_subset(subset.range, superset.range)
 	end
 
 	---@param op string
@@ -587,7 +618,7 @@ do -- Tuple
 		self.var_arg = var_arg or Tuple.default_var_arg
 	end
 
-	--- compares two tuples
+	---compares two tuples
 	---
 	---```lua
 	---local a, b = x, y
@@ -599,25 +630,23 @@ do -- Tuple
 	---@param superset type-track.Tuple
 	---@return boolean
 	function Tuple.is_subset(subset, superset)
+		-- Subsets are always of equal or longer length than supersets.
+		-- `var_args` are not counted because there may be 0 args supplied in that
+		-- portion.
+		-- (T, T) </: (T, T, T)
+		-- (T, T, ...T) </: (T, T, T, ...T)
+		-- (T, T, ...T) </: (T, T, T)
+		-- (T, T) </: (T, T, T, ...T)
+		if #subset.types < #superset.types then
+			return false
+		end
+
 		local sub_var_arg = subset.var_arg
 		local super_var_arg = superset.var_arg
 
-		-- by default, latter elements in a tuple are discarded, meaning anything
-		-- can be entered there without an error
-		if sub_var_arg and not super_var_arg then
-			return false
-		end
-
-		-- calling a function with less arguments than required is illegal
-		if
-			not sub_var_arg
-			and super_var_arg
-			and #subset.types > #superset.types
-		then
-			return false
-		end
-
-		-- calling a function with mismatching var-args is illegal
+		-- A </: B => (...A) </: (...B)
+		-- A </: B => (B, ...A) </: (...B)
+		-- (A, ...T) <: (A)
 		if
 			sub_var_arg
 			and super_var_arg
@@ -627,21 +656,15 @@ do -- Tuple
 		end
 
 		-- compare element-wise
-		for i, super_type in ipairs(superset.types) do
-			local sub_type = subset:at(i)
-			if not sub_type or not is_subset(sub_type, super_type) then
+		-- given A <: B and B </: A
+		-- (A, A) <: (B, B)
+		-- (A, A, A) <: (B, B)
+		-- (A, A, A) <: (B, B, ...B)
+		-- (B, B) </: (A, A)
+		for i, sub_type in ipairs(subset.types) do
+			local super_type = superset:at(i)
+			if super_type and not is_subset(sub_type, super_type) then
 				return false
-			end
-		end
-
-		-- compare var-arg
-		if super_var_arg then
-			---@cast sub_var_arg type-track.Type
-			for i = #superset.types + 1, #subset.types do
-				local sub_type = subset.types[i]
-				if not is_subset(sub_type, super_var_arg) then
-					return false
-				end
 			end
 		end
 

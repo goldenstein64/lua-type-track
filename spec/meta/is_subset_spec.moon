@@ -20,6 +20,37 @@ describe 'is_subset', ->
 	it 'accepts A & B <: A', ->
 		assert.is_true is_subset A * B, A
 
+	it 'accepts { A: A, B: B } <: { A: A }', ->
+		index_a = Operator 'index', A, A
+		index_b = Operator 'index', B, B
+
+		sub_t = Intersection { index_a, index_b }
+		super_t = index_a
+
+		assert.is_true is_subset sub_t, super_t
+
+	it 'accepts ({ A: A, B: B }, { A: A, B: B }) <: { A: A }', ->
+		index_a = Operator 'index', A, A
+		index_b = Operator 'index', B, B
+
+		-- type SUB = read { A: "A", B: "B" }
+		sub_t = Intersection { index_a, index_b }
+
+		-- type SUPER = read { A: "A" }
+		super_t = index_a
+
+		-- SUB <: SUPER
+		assert.is_true is_subset sub_t, super_t
+
+		-- a, b: (SUB, SUB)
+		ab_type = Tuple { sub_t, sub_t }
+
+		-- x: SUPER
+		x_type = super_t
+
+		-- x = a, b
+		assert.is_true is_subset ab_type, x_type
+
 	it 'accepts { call: A -> () } <: { call(T): T -> () }', ->
 		type1 = Operator 'call', A, empty
 		type2 = GenericOperator(
