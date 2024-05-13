@@ -8,8 +8,6 @@ empty = Tuple {}
 unknown_var = Tuple {}, Unknown
 
 describe 'is_subset', ->
-	setup -> Tuple.default_var_arg = nil
-
 	A = Literal 'A'
 	B = Literal 'B'
 	C = Literal 'C'

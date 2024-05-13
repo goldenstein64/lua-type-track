@@ -46,8 +46,6 @@ string_of = memoize(string_of)
 local _nil = Operator("type", Never, string_of("nil"))
 	* Operator("truthy", Never, _false)
 
-Tuple.default_var_arg = _nil
-
 local thread = Operator("type", Never, string_of("thread"))
 local userdata = Operator("type", Never, string_of("userdata"))
 

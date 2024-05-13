@@ -9,7 +9,7 @@ describe 'Operator', ->
 	C = Literal 'C'
 
 	AB = Tuple { A, B }
-	ABC = Tuple { A, B, C } -- ABC\is_subset AB
+	ABC = Tuple { A, B, C }
 	assert.is_true is_subset ABC, AB
 
 	it 'is a Type', ->

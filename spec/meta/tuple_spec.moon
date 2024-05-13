@@ -30,12 +30,19 @@ describe 'Tuple', ->
 			assert.is_false Tuple.is_subset tup1, tup2
 			assert.is_false Tuple.is_subset tup2, tup1
 
-		it 'accepts var-args if subset has equal elements', ->
+		it 'accepts any var-args if both sets have equal element count', ->
 			long_tup = Tuple { A, A, A }
 			long_var_tup = Tuple { A, A, A }, A
+			long_var_unknown_tup = Tuple { A, A, A }, Unknown
 
 			assert.is_true Tuple.is_subset long_tup, long_var_tup
 			assert.is_true Tuple.is_subset long_var_tup, long_tup
+
+			-- ...Unknown is discarded here
+			assert.is_true Tuple.is_subset long_var_unknown_tup, long_tup
+
+			-- ...Unknown is empty here
+			assert.is_true Tuple.is_subset long_tup, long_var_unknown_tup
 
 		it 'rejects subsets with var-args and supersets without var-args', ->
 			-- var: (...A)
@@ -68,35 +75,25 @@ describe 'Tuple', ->
 
 			assert.is_false Tuple.is_subset long_tup, short_tup
 
-	describe 'without default_var_arg', ->
-		setup -> Tuple.default_var_arg = nil
-		teardown -> Tuple.default_var_arg = nil
+	describe 'at', ->
+		it 'returns its types by index', ->
+			tup = Tuple { A, B, C }
 
-		describe 'at', ->
-			it 'returns its types by index', ->
-				tup = Tuple { A, B, C }
+			assert.equal A, tup\at 1
+			assert.equal B, tup\at 2
+			assert.equal C, tup\at 3
 
-				assert.equal A, tup\at 1
-				assert.equal B, tup\at 2
-				assert.equal C, tup\at 3
+		it 'returns var-args after its length is exceeded', ->
+			tup = Tuple { A }, B
 
-			it 'returns var-args after its length is exceeded', ->
-				tup = Tuple { A }, B
+			assert.equal A, tup\at 1
+			assert.equal B, tup\at 2
+			assert.equal B, tup\at 3
+			assert.equal B, tup\at 4
 
-				assert.equal A, tup\at 1
-				assert.equal B, tup\at 2
-				assert.equal B, tup\at 3
-				assert.equal B, tup\at 4
+		it 'returns nil outside of range', ->
+			tup = Tuple { A, B }
 
-			it 'returns nil if var-args is nil', ->
-				tup = Tuple { A, B }
-
-				assert.equal A, tup\at 1
-				assert.equal B, tup\at 2
-				assert.is_nil tup\at 3
-
-	describe 'with default_var_arg', ->
-		setup -> Tuple.default_var_arg = Nil
-		teardown -> Tuple.default_var_arg = nil
-
-		-- does nothing
+			assert.equal A, tup\at 1
+			assert.equal B, tup\at 2
+			assert.equal nil, tup\at 3

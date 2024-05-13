@@ -7,7 +7,6 @@ local permute = require("type-track.permute")
 ---a multi-value type. Importantly, it describes how arguments and return
 ---values are structured.
 ---@class type-track.Tuple.Class
----@field default_var_arg type-track.Type?
 ---@overload fun(types: type-track.Type[], var_arg?: type-track.Type): type-track.Tuple
 local Tuple
 
@@ -193,15 +192,6 @@ local function is_subset(subset, superset)
 			return not superset.var_arg or is_subset(subset, superset.var_arg)
 		elseif superset_len == 1 then
 			return is_subset(subset, superset.types[1])
-		elseif Tuple.default_var_arg then
-			for i = 2, superset_len do
-				local super_elem = superset.types[i]
-				if not is_subset(Tuple.default_var_arg, super_elem) then
-					return false
-				end
-			end
-
-			return is_subset(subset, superset.types[1])
 		end
 
 		return false
@@ -367,7 +357,8 @@ do -- Type
 		return nil
 	end
 
-	---returns the `i`th element in this type
+	---returns the `i`th element in this type. If there is no element defined
+	---there, it returns `nil`.
 	---
 	---This implementation is typically moot for types of a single value, like
 	---`Operator` or `Literal`, but useful for `Tuple`s or `Tuple`-containing
@@ -375,7 +366,7 @@ do -- Type
 	---@param i integer
 	---@return type-track.Type?
 	function TypeInst:at(i)
-		return i == 1 and self or Tuple.default_var_arg
+		return i == 1 and self or nil
 	end
 
 	---converts a type into its simplest form. It always returns a new `Type`.
@@ -606,7 +597,7 @@ do -- Tuple
 	---@param var_arg? type-track.Type
 	function Tuple:new(types, var_arg)
 		self.types = types
-		self.var_arg = var_arg or Tuple.default_var_arg
+		self.var_arg = var_arg
 	end
 
 	---compares two tuples
@@ -622,7 +613,7 @@ do -- Tuple
 	---@return boolean
 	function Tuple.is_subset(subset, superset)
 		-- Subsets are always of equal or longer length than supersets.
-		-- `var_args` are not counted because there may be 0 args supplied in that
+		-- `var_arg` is not counted because there may be 0 args supplied in that
 		-- portion.
 		-- (T, T) </: (T, T, T)
 		-- (T, T, ...T) </: (T, T, T, ...T)
@@ -632,17 +623,13 @@ do -- Tuple
 			return false
 		end
 
-		local sub_var_arg = subset.var_arg
-		local super_var_arg = superset.var_arg
+		local sub_var_arg = subset.var_arg or Never
+		local super_var_arg = superset.var_arg or Unknown
 
 		-- A </: B => (...A) </: (...B)
 		-- A </: B => (B, ...A) </: (...B)
 		-- (A, ...T) <: (A)
-		if
-			sub_var_arg
-			and super_var_arg
-			and not is_subset(sub_var_arg, super_var_arg)
-		then
+		if not is_subset(sub_var_arg, super_var_arg) then
 			return false
 		end
 
@@ -652,9 +639,20 @@ do -- Tuple
 		-- (A, A, A) <: (B, B)
 		-- (A, A, A) <: (B, B, ...B)
 		-- (B, B) </: (A, A)
-		for i, sub_type in ipairs(subset.types) do
-			local super_type = superset:at(i)
-			if super_type and not is_subset(sub_type, super_type) then
+		for i, super_type in ipairs(superset.types) do
+			local sub_type = subset.types[i]
+			if not is_subset(sub_type, super_type) then
+				return false
+			end
+		end
+
+		-- compare var_args
+		-- given A <: B and B </: A
+		-- (A) <: (...B)
+		-- (B) </: (...A)
+		for i = #superset.types + 1, #subset.types do
+			local sub_type = subset.types[i]
+			if not is_subset(sub_type, super_var_arg) then
 				return false
 			end
 		end
@@ -718,7 +716,7 @@ do -- Tuple
 			table.insert(strings, t:sub_visited(visited))
 		end
 
-		if self.var_arg ~= Tuple.default_var_arg and self.var_arg then
+		if self.var_arg then
 			table.insert(strings, VAR_STR:format(self.var_arg:sub_visited(visited)))
 		end
 
@@ -1187,6 +1185,12 @@ do -- Unknown
 		return nil
 	end
 
+	---@param i number
+	---@return type-track.Type?
+	function UnknownInst:at(i)
+		return Unknown
+	end
+
 	Unknown = UnknownClass()
 	unknown_var = Tuple({}, Unknown)
 end
@@ -1216,7 +1220,7 @@ do -- Never
 	---@param i number
 	---@return type-track.Type?
 	function NeverInst:at(i)
-		return Tuple.default_var_arg
+		return nil
 	end
 
 	Never = NeverClass()
