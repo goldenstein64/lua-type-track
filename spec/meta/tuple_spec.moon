@@ -1,7 +1,4 @@
-import
-	Type, Tuple, Literal, Operator, Intersection
-	is_subset, Never
-from require 'type-track.meta'
+import Type, Tuple, Literal, Unknown from require 'type-track.meta'
 
 describe 'Tuple', ->
 	it 'is a Type', ->

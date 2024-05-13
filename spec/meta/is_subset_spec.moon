@@ -1,7 +1,6 @@
 import
-	Type, Tuple, Union, Intersection, Operator, Literal, GenericOperator
-	Never, Unknown
 	is_subset
+	Type, Tuple, Operator, Literal, GenericOperator, Unknown
 from require 'type-track.meta'
 
 empty = Tuple {}
@@ -22,7 +21,7 @@ describe 'is_subset', ->
 		index_a = Operator 'index', A, A
 		index_b = Operator 'index', B, B
 
-		sub_t = Intersection { index_a, index_b }
+		sub_t = index_a * index_b
 		super_t = index_a
 
 		assert.is_true is_subset sub_t, super_t
@@ -32,7 +31,7 @@ describe 'is_subset', ->
 		index_b = Operator 'index', B, B
 
 		-- type SUB = read { A: "A", B: "B" }
-		sub_t = Intersection { index_a, index_b }
+		sub_t = index_a * index_b
 
 		-- type SUPER = read { A: "A" }
 		super_t = index_a

@@ -1,4 +1,4 @@
-import Type, Callable, Union, Intersection, Tuple, Literal from require 'type-track.meta'
+import Type, Union, Intersection from require 'type-track.meta'
 
 describe 'type', ->
 	it 'creates Unions with + operator', ->

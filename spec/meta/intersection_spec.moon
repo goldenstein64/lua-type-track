@@ -1,6 +1,6 @@
 import
-	Tuple, Literal, Intersection, Never, Operator
-	Type, is_subset
+	is_subset
+	Type, Tuple, Literal, Intersection, Never, Operator
 from require 'type-track.meta'
 
 describe 'Intersection', ->
