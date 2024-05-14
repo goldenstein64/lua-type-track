@@ -312,6 +312,15 @@ do -- Type
 	---determines whether `subset` is a subset of `superset`, where both types
 	---are of the same class
 	---
+	---Lua's simplest semantic test for `is_subset` is assignment.
+	---
+	---```lua
+	---a: A
+	---b: B
+	---
+	---b = a -- `is_subset(A, B)` must be true to assign `a` to `b`
+	---```
+	---
 	---Generally, based on its element relationship:
 	---- Covariance - every element of `subset` must be a subset of its
 	---  corresponding element in `superset`
@@ -691,6 +700,11 @@ do -- Tuple
 
 	---@return type-track.Type
 	function TupleInst:_unify()
+		-- empty tuples are equivalent to Never
+		if #self.types == 0 and not self.var_arg then
+			return Never
+		end
+
 		local unified_args = {}
 		for i, elem in ipairs(self.types) do
 			unified_args[i] = elem:unify()

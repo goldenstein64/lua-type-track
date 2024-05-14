@@ -1,4 +1,4 @@
-import Type, Tuple, Literal, Unknown from require 'type-track.meta'
+import Type, Tuple, Literal, Unknown, Never from require 'type-track.meta'
 
 describe 'Tuple', ->
 	it 'is a Type', ->
@@ -94,3 +94,9 @@ describe 'Tuple', ->
 			assert.equal A, tup\at 1
 			assert.equal B, tup\at 2
 			assert.equal nil, tup\at 3
+
+	describe 'unify', ->
+		it 'returns Never when empty', ->
+			tup = Tuple {}
+
+			assert.equal Never, tup\unify!

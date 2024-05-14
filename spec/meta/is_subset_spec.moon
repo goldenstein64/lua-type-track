@@ -117,8 +117,8 @@ describe 'is_subset', ->
 		assert.is_false is_subset B * C, A * B
 
 	describe 'when compared up to tuples', ->
-		it 'accepts anything compared to zero elements', ->
-			assert.is_true is_subset Type!, Tuple {}
+		it 'rejects anything compared to zero elements', ->
+			assert.is_false is_subset Type!, Tuple {}
 
 		it 'accepts the same type compared to zero elements with a var-arg', ->
 			assert.is_true is_subset A, Tuple {}, A
@@ -128,5 +128,5 @@ describe 'is_subset', ->
 			assert.is_true is_subset A, Tuple { A }
 			assert.is_false is_subset B, Tuple { A }
 
-		it 'rejects the same type compared to two elements', ->
-			assert.is_false is_subset A, Tuple { A, A }
+		it 'rejects anything compared to two elements', ->
+			assert.is_false is_subset Type!, Tuple { Type!, Type! }
