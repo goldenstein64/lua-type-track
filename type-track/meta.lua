@@ -303,6 +303,7 @@ end
 do -- Type
 	---@class type-track.Type : Inheritable
 	---@field unified type-track.Type?
+	---@field repr_name string?
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator add(type-track.Type): type-track.Union
 	local TypeInst = muun("Type", Inheritable)
@@ -494,16 +495,24 @@ do -- Type
 			visited.n = visited.n + 1
 			visit_id = visited.n
 			visited[self] = visit_id
-			return string.format("<%d>%s", visit_id, self:__tostring(visited))
+			return string.format(
+				"<%d>%s",
+				visit_id,
+				self.repr_name or self:repr(visited)
+			)
 		end
 	end
 
+	---@param visited { [type-track.Type]: number?, n: number }
+	---@return string
+	function TypeInst:repr(visited)
+		error("not implemented")
+	end
 	---every type is serializable. The expectation is, if a type serializes to
 	---the same string as another type, they are the same type.
-	---@param visited { [type-track.Type]: number?, n: number }?
 	---@return string
-	function TypeInst:__tostring(visited)
-		error("__tostring metamethod is not implemented on this type")
+	function TypeInst:__tostring()
+		return self.repr_name or self:repr({ n = 0 })
 	end
 
 	function Type:__inherited(cls)
@@ -513,6 +522,7 @@ do -- Type
 		-- set metamethods
 		base.__add = super_base.__add
 		base.__mul = super_base.__mul
+		base.__tostring = super_base.__tostring
 	end
 end
 
@@ -579,9 +589,7 @@ do -- Operator
 
 	---@param visited { [type-track.Type]: number?, n: number }
 	---@return string
-	function OperatorInst:__tostring(visited)
-		visited = visited or { n = 0 }
-
+	function OperatorInst:repr(visited)
 		return string.format(
 			"{ %s: %s -> %s }",
 			self.op,
@@ -720,11 +728,9 @@ do -- Tuple
 
 	local VAR_STR = "...%s"
 
-	---@param visited { [type-track.Type]: number?, n: number }?
+	---@param visited { [type-track.Type]: number?, n: number }
 	---@return string
-	function TupleInst:__tostring(visited)
-		visited = visited or { n = 0 }
-
+	function TupleInst:repr(visited)
 		local strings = {} ---@type string[]
 		for _, t in ipairs(self.types) do
 			table.insert(strings, t:sub_visited(visited))
@@ -875,9 +881,8 @@ do -- Union
 	end
 
 	---@param visited { [type-track.Type]: number?, n: number }
-	function UnionInst:__tostring(visited)
-		visited = visited or { n = 0 }
-
+	---@return string
+	function UnionInst:repr(visited)
 		local strings = {} ---@type string[]
 		for _, t in ipairs(self.types) do
 			table.insert(strings, t:sub_visited(visited))
@@ -1075,9 +1080,9 @@ do -- Intersection
 		return distribute_unions(flattened)
 	end
 
-	function IntersectionInst:__tostring(visited)
-		visited = visited or { n = 0 }
-
+	---@param visited { [type-track.Type]: number?, n: number }
+	---@return string
+	function IntersectionInst:repr(visited)
 		local strings = {}
 		for _, t in ipairs(self.types) do
 			table.insert(strings, t:sub_visited(visited))
@@ -1126,8 +1131,9 @@ do -- Literal
 		return self.ops:get_domain(op)
 	end
 
-	function LiteralInst:__tostring(visited)
-		visited = visited or { n = 0 }
+	---@param visited { [type-track.Type]: number?, n: number }
+	---@return string
+	function LiteralInst:repr(visited)
 		return string.format('"%s: %s"', self.value, self.ops:sub_visited(visited))
 	end
 end
@@ -1172,8 +1178,8 @@ do -- Free
 		return self:unwrap():unify()
 	end
 
-	function FreeInst:__tostring(...)
-		return self:unwrap():__tostring(...)
+	function FreeInst:repr(...)
+		return self:unwrap():repr(...)
 	end
 end
 
@@ -1187,9 +1193,7 @@ do -- Unknown
 	---@operator add(type-track.Type): type-track.Union
 	local UnknownInst = UnknownClass --[[@as type-track.Unknown]]
 
-	function UnknownInst:__tostring()
-		return "unknown"
-	end
+	UnknownInst.repr_name = "unknown"
 
 	---Evaluations are never valid on `Unknown`.
 	---@param op string
@@ -1219,9 +1223,7 @@ do -- Never
 	---@operator add(type-track.Type): type-track.Union
 	local NeverInst = NeverClass --[[@as type-track.Never]]
 
-	function NeverInst:__tostring()
-		return "never"
-	end
+	NeverInst.repr_name = "never"
 
 	---Evaluations are always valid on `Never` and return itself.
 	---@param op string
