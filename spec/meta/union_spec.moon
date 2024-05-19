@@ -25,6 +25,7 @@ describe 'Union', ->
 
 		it 'simplifies nested unions with duplicates', ->
 			union = Union { A, Union { A, B } }
+
 			unified = union\unify!
 
 			assert.equal 2, #unified.types

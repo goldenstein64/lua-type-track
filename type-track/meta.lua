@@ -508,6 +508,7 @@ do -- Type
 	function TypeInst:repr(visited)
 		error("not implemented")
 	end
+
 	---every type is serializable. The expectation is, if a type serializes to
 	---the same string as another type, they are the same type.
 	---@return string
@@ -823,19 +824,24 @@ do -- Union
 		return Intersection(all_domains)
 	end
 
-	local function union_insert(types, elem)
-		if is_subset_of_any(elem, types) then
+	---@param union type-track.Type[]
+	---@param elem type-track.Type
+	local function union_insert(union, elem)
+		-- if result already contains its superset, don't insert it
+		if is_subset_of_any(elem, union) then
 			return
 		end
 
-		for i = #types, 1, -1 do
-			local elem2 = types[i]
+		-- otherwise, remove all of its subsets
+		for i = #union, 1, -1 do
+			local elem2 = union[i]
 			if is_subset(elem2, elem) then
-				table.remove(types, i)
+				table.remove(union, i)
 			end
 		end
 
-		table.insert(types, elem)
+		-- and insert it into the union
+		table.insert(union, elem)
 	end
 
 	---@param types type-track.Type[]
@@ -847,8 +853,7 @@ do -- Union
 				return { Unknown }
 			elseif elem.__class == Union then
 				---@cast elem type-track.Union
-				local elem_types = elem.types
-				for _, sub_elem in ipairs(elem_types) do
+				for _, sub_elem in ipairs(elem.types) do
 					union_insert(result, sub_elem)
 				end
 			else
@@ -1001,6 +1006,23 @@ do -- Intersection
 		end
 	end
 
+	---@param intersection type-track.Type[]
+	---@param elem type-track.Type
+	local function intersection_insert(intersection, elem)
+		if any_are_subset(intersection, elem) then
+			return
+		end
+
+		for i = #intersection, 1, -1 do
+			local elem2 = intersection[i]
+			if is_subset(elem, elem2) then
+				table.remove(intersection, i)
+			end
+		end
+
+		table.insert(intersection, elem)
+	end
+
 	---@param types type-track.Type[]
 	---@return type-track.Type[]
 	local function flatten_intersection(types)
@@ -1011,16 +1033,11 @@ do -- Intersection
 				return { Never }
 			elseif elem.__class == Intersection then
 				---@cast elem type-track.Intersection
-				local elem_types = elem.types
-				table.move(elem_types, 1, #elem_types, #result + 1, result)
-			elseif not any_are_subset(result, elem) then
-				for i = #result, 1, -1 do
-					local type2 = result[i]
-					if is_subset(elem, type2) then
-						table.remove(result, i)
-					end
+				for _, sub_elem in ipairs(elem.types) do
+					intersection_insert(result, sub_elem)
 				end
-				table.insert(result, elem)
+			else
+				intersection_insert(result, elem)
 			end
 		end
 

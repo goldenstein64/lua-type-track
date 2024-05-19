@@ -25,6 +25,19 @@ describe 'Intersection', ->
 			for t in *unified.types
 				assert.is_false t\is_instance Intersection
 
+		it 'simplifies nested intersections with duplicates', ->
+			inter = Intersection { A, Intersection { A, B } }
+
+			unified = inter\unify!
+
+			assert.equal 2, #unified.types
+			{ elem1, elem2 } = unified.types
+			assert.is_true elem1 == A or elem1 == B
+			if elem1 == A
+				assert.equal B, elem2
+			elseif elem1 == B
+				assert.equal A, elem2
+
 		it 'simplifies subset operators', ->
 			op1 = Operator 'call', A, C
 			op2 = Operator 'call', (Tuple { A, B }), C
