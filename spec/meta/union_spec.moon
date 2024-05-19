@@ -22,3 +22,15 @@ describe 'Union', ->
 
 			for t in *unified.types
 				assert.is_false t\is_instance Union
+
+		it 'simplifies nested unions with duplicates', ->
+			union = Union { A, Union { A, B } }
+			unified = union\unify!
+
+			assert.equal 2, #unified.types
+			{ elem1, elem2 } = unified.types
+			assert.is_true elem1 == A or elem1 == B
+			if elem1 == A
+				assert.equal B, elem2
+			elseif elem1 == B
+				assert.equal A, elem2

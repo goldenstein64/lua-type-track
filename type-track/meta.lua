@@ -823,6 +823,21 @@ do -- Union
 		return Intersection(all_domains)
 	end
 
+	local function union_insert(types, elem)
+		if is_subset_of_any(elem, types) then
+			return
+		end
+
+		for i = #types, 1, -1 do
+			local elem2 = types[i]
+			if is_subset(elem2, elem) then
+				table.remove(types, i)
+			end
+		end
+
+		table.insert(types, elem)
+	end
+
 	---@param types type-track.Type[]
 	local function flatten_union(types)
 		local result = {} ---@type type-track.Type[]
@@ -833,17 +848,14 @@ do -- Union
 			elseif elem.__class == Union then
 				---@cast elem type-track.Union
 				local elem_types = elem.types
-				table.move(elem_types, 1, #elem_types, #result + 1, result)
-			elseif not is_subset_of_any(elem, result) then
-				for i = #result, 1, -1 do
-					local type2 = result[i]
-					if is_subset(type2, elem) then
-						table.remove(result, i)
-					end
+				for _, sub_elem in ipairs(elem_types) do
+					union_insert(result, sub_elem)
 				end
-				table.insert(result, elem)
+			else
+				union_insert(result, elem)
 			end
 		end
+
 		return result
 	end
 
