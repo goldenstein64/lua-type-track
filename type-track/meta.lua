@@ -1178,13 +1178,14 @@ do -- Free
 
 	---@return type-track.Type
 	function FreeInst:unwrap()
-		local value = assert(self.value, "attempt to use an empty Free type")
-		if value.__class == Free then
-			---@cast value type-track.Free
-			return value:unwrap()
-		else
-			return value
+		local result = self ---@type type-track.Type
+
+		while result.__class == Free do
+			---@cast result type-track.Free
+			result = assert(result.value, "attempt to use an empty Free type")
 		end
+
+		return result
 	end
 
 	---@return type-track.Type? range
@@ -1203,14 +1204,31 @@ do -- Free
 	end
 
 	---@return type-track.Type
-	function FreeInst:_unify()
-		return self:unwrap():unify()
+	function FreeInst:unify(...)
+		if self.unified then
+			return self.unified
+		end
+
+		return self:unwrap():unify(...)
 	end
 
 	---@return string
 	function FreeInst:repr(...)
 		local val = self:unwrap()
 		return val.repr_name or val:repr(...)
+	end
+
+	function FreeInst:__tostring()
+		local val = self ---@type type-track.Type?
+		while val and val.__class == Free do
+			---@cast val type-track.Free
+			val = val.value
+		end
+		if val then
+			return tostring(val)
+		else
+			return "?"
+		end
 	end
 end
 
