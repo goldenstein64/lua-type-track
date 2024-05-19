@@ -1178,8 +1178,10 @@ do -- Free
 		return self:unwrap():unify()
 	end
 
+	---@return string
 	function FreeInst:repr(...)
-		return self:unwrap():repr(...)
+		local val = self:unwrap()
+		return val.repr_name or val:repr(...)
 	end
 end
 
