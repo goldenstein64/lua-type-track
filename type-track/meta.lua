@@ -503,7 +503,12 @@ do -- Type
 
 	---@param visited { [type-track.Type]: number?, n: number }
 	---@return string
-	function TypeInst:sub_visited(visited)
+	function TypeInst:sub_repr(visited)
+		if self.__class == Free then
+			---@cast self type-track.Free
+			self = self:unwrap()
+		end
+
 		local visit_id = visited[self]
 		if visit_id then
 			return string.format("<%d>", visit_id)
@@ -529,7 +534,7 @@ do -- Type
 	---the same string as another type, they are the same type.
 	---@return string
 	function TypeInst:__tostring()
-		return self.repr_name or self:repr({ n = 0 })
+		return self.repr_name or self:sub_repr({ n = 0 })
 	end
 
 	function Type:__inherited(cls)
@@ -622,8 +627,8 @@ do -- Operator
 		return string.format(
 			"{ %s: %s -> %s }",
 			self.op,
-			self.domain:sub_visited(visited),
-			self.range:sub_visited(visited)
+			self.domain:sub_repr(visited),
+			self.range:sub_repr(visited)
 		)
 	end
 end
@@ -771,11 +776,11 @@ do -- Tuple
 	function TupleInst:repr(visited)
 		local strings = {} ---@type string[]
 		for _, t in ipairs(self.types) do
-			table.insert(strings, t:sub_visited(visited))
+			table.insert(strings, t:sub_repr(visited))
 		end
 
 		if self.var_arg then
-			table.insert(strings, VAR_STR:format(self.var_arg:sub_visited(visited)))
+			table.insert(strings, VAR_STR:format(self.var_arg:sub_repr(visited)))
 		end
 
 		return string.format("(%s)", table.concat(strings, ", "))
@@ -959,7 +964,7 @@ do -- Union
 	function UnionInst:repr(visited)
 		local strings = {} ---@type string[]
 		for _, t in ipairs(self.types) do
-			table.insert(strings, t:sub_visited(visited))
+			table.insert(strings, t:sub_repr(visited))
 		end
 		table.sort(strings)
 		return string.format("[%s]", table.concat(strings, " | "))
@@ -1181,7 +1186,7 @@ do -- Intersection
 	function IntersectionInst:repr(visited)
 		local strings = {}
 		for _, t in ipairs(self.types) do
-			table.insert(strings, t:sub_visited(visited))
+			table.insert(strings, t:sub_repr(visited))
 		end
 		table.sort(strings)
 		return string.format("[%s]", table.concat(strings, " & "))
@@ -1241,7 +1246,7 @@ do -- Literal
 	---@param visited { [type-track.Type]: number?, n: number }
 	---@return string
 	function LiteralInst:repr(visited)
-		return string.format('"%s: %s"', self.value, self.ops:sub_visited(visited))
+		return string.format('["%s": %s]', self.value, self.ops:sub_repr(visited))
 	end
 end
 
@@ -1478,7 +1483,7 @@ do -- GenericOperator
 		return string.format(
 			"{ %s(): %s }",
 			self.op,
-			self.derive_fn(unknown_var):sub_visited(visited)
+			self.derive_fn(unknown_var):sub_repr(visited)
 		)
 	end
 end
