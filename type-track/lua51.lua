@@ -17,13 +17,13 @@ local Type, Tuple, Operator, Literal, Free, Never, Unknown, GenericOperator =
 local function memoize(f)
 	local cache = {}
 	return function(a, ...)
-		if cache[a] ~= nil then
-			return cache[a]
-		else
-			local r = f(a, ...)
+		local r = cache[a]
+		if cache[a] == nil then
+			r = f(a, ...)
 			cache[a] = r
-			return r
 		end
+
+		return r
 	end
 end
 
