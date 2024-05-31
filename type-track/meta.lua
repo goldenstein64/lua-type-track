@@ -452,16 +452,6 @@ do -- Type
 	---@param other type-track.Type
 	---@return type-track.Union
 	function TypeInst:__add(other)
-		if self.__class == Free then
-			---@cast self type-track.Free
-			self = self:unwrap()
-		end
-
-		if other.__class == Free then
-			---@cast other type-track.Free
-			other = other:unwrap()
-		end
-
 		local values = {}
 		if self.__class == Union then
 			---@cast self type-track.Union
@@ -489,16 +479,6 @@ do -- Type
 	---@param other type-track.Type
 	---@return type-track.Intersection
 	function TypeInst:__mul(other)
-		if self.__class == Free then
-			---@cast self type-track.Free
-			self = self:unwrap()
-		end
-
-		if other.__class == Free then
-			---@cast other type-track.Free
-			other = other:unwrap()
-		end
-
 		local values = {}
 		if self.__class == Intersection then
 			---@cast self type-track.Intersection
