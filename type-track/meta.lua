@@ -12,9 +12,9 @@ local permute = require("type-track.permute")
 local Tuple
 
 ---the base structural type
----@class type-track.Operator.Class
----@overload fun(op: string, domain: type-track.Type, range: type-track.Type): type-track.Operator
-local Operator
+---@class type-track.Operation.Class
+---@overload fun(op: string, domain: type-track.Type, range: type-track.Type): type-track.Operation
+local Operation
 
 ---an aggregation declaring at least one type lives in its value
 ---@class type-track.Union.Class
@@ -52,8 +52,8 @@ local unknown_var
 ---@type type-track.Never
 local Never
 
----@alias type-track.GenericOperator.derive_fn fun(type_params: type-track.Type): (domain: type-track.Type?, range: type-track.Type?)
----@alias type-track.GenericOperator.infer_fn fun(domain: type-track.Type, range: type-track.Type?): (type_params: type-track.Type?)
+---@alias type-track.GenericOperation.derive_fn fun(type_params: type-track.Type): (domain: type-track.Type?, range: type-track.Type?)
+---@alias type-track.GenericOperation.infer_fn fun(domain: type-track.Type, range: type-track.Type?): (type_params: type-track.Type?)
 
 ---an operator that captures its types on usage
 ---
@@ -80,7 +80,7 @@ local Never
 ---
 ---```lua
 ----- <T>(T, T) -> (T?)
----local example = GenericOperator(
+---local example = GenericOperation(
 ---  'call',
 ---  function(type_params) -- derive
 ---    local T = type_params:at(1)
@@ -97,9 +97,9 @@ local Never
 ---```
 ---
 ---generating the type functions programmatically has not been explored.
----@class type-track.GenericOperator.Class
----@overload fun(op: string, derive_fn: type-track.GenericOperator.derive_fn, infer_fn: type-track.GenericOperator.infer_fn): type-track.GenericOperator
-local GenericOperator
+---@class type-track.GenericOperation.Class
+---@overload fun(op: string, derive_fn: type-track.GenericOperation.derive_fn, infer_fn: type-track.GenericOperation.infer_fn): type-track.GenericOperation
+local GenericOperation
 
 ---@type fun(subset: type-track.Type, superset_list: type-track.Type[], i?: integer, j?: integer): boolean
 local is_subset_of_any
@@ -165,8 +165,8 @@ local function is_subset(subset, superset)
 		if sub_cls == Free then
 			---@cast subset type-track.Free
 			subset = subset:unwrap()
-		elseif sub_cls == GenericOperator then
-			---@cast subset type-track.GenericOperator
+		elseif sub_cls == GenericOperation then
+			---@cast subset type-track.GenericOperation
 			local new_subset = subset:match(superset)
 			if not new_subset then
 				return false
@@ -182,8 +182,8 @@ local function is_subset(subset, superset)
 		if super_cls == Free then
 			---@cast superset type-track.Free
 			superset = superset:unwrap()
-		elseif super_cls == GenericOperator then
-			---@cast superset type-track.GenericOperator
+		elseif super_cls == GenericOperation then
+			---@cast superset type-track.GenericOperation
 			superset = assert(superset.derive_fn(unknown_var))
 		else
 			break
@@ -229,23 +229,23 @@ local function is_subset(subset, superset)
 	-- subtype comparisons
 	if sub_cls == Tuple then
 		---@cast subset type-track.Tuple
-		---@cast superset type-track.Operator | type-track.Literal
+		---@cast superset type-track.Operation | type-track.Literal
 		return Tuple.is_subset(subset, Tuple({ superset }))
 	elseif sub_cls == Union then
 		---@cast subset type-track.Union
-		---@cast superset type-track.Operator | type-track.Literal
+		---@cast superset type-track.Operation | type-track.Literal
 		-- the use cases for this are not significant
 		return all_are_subset(subset.types, superset)
 	elseif sub_cls == Intersection then
 		---@cast subset type-track.Intersection
-		---@cast superset type-track.Operator | type-track.Literal
+		---@cast superset type-track.Operation | type-track.Literal
 		return any_are_subset(subset.types, superset)
 	elseif sub_cls == Literal then
 		---@cast subset type-track.Literal
-		---@cast superset type-track.Operator
+		---@cast superset type-track.Operation
 		return is_subset(subset.ops, superset)
-	elseif sub_cls == Operator then
-		---@cast subset type-track.Operator
+	elseif sub_cls == Operation then
+		---@cast subset type-track.Operation
 		---@cast superset type-track.Literal
 		return false
 	end
@@ -352,13 +352,13 @@ do -- Type
 	---  corresponding element in `superset`
 	---
 	---For each class:
-	---- `Operator`s have contravariant domains and covariant ranges
+	---- `Operation`s have contravariant domains and covariant ranges
 	---- `Tuple`s have covariant elements
 	---- `Union`s have covariant elements
 	---- `Intersection`s have contravariant elements (?)
 	---- `Literal`s have invariant values and covariant supporting operators
 	---- `Free` types are covariant
-	---- `GenericOperator`s' variance are determined by their inference function
+	---- `GenericOperation`s' variance are determined by their inference function
 	---- `Never` and `Unknown` are not parameterized
 	---@param subset type-track.Type
 	---@param superset type-track.Type
@@ -392,7 +392,7 @@ do -- Type
 	---there, it returns `nil`.
 	---
 	---This implementation is typically moot for types of a single value, like
-	---`Operator` or `Literal`, but useful for `Tuple`s or `Tuple`-containing
+	---`Operation` or `Literal`, but useful for `Tuple`s or `Tuple`-containing
 	---types.
 	---@param i integer
 	---@return type-track.Type?
@@ -553,33 +553,33 @@ do -- Type
 	end
 end
 
-do -- Operator
+do -- Operation
 	---represents a possible operation on a value, e.g. addition, concatenation,
 	---etc.
-	---@class type-track.Operator : type-track.Type
+	---@class type-track.Operation : type-track.Type
 	---@field domain type-track.Type
 	---@field range type-track.Type
 	---@field op string
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator add(type-track.Type): type-track.Union
-	local OperatorInst = muun("Operator", Type)
+	local OperationInst = muun("Operation", Type)
 
-	Operator = OperatorInst --[[@as type-track.Operator.Class]]
+	Operation = OperationInst --[[@as type-track.Operation.Class]]
 
-	---@param self type-track.Operator
+	---@param self type-track.Operation
 	---@param op string
 	---@param domain type-track.Type
 	---@param range type-track.Type
-	function Operator:new(op, domain, range)
+	function Operation:new(op, domain, range)
 		self.domain = domain
 		self.range = range
 		self.op = op
 	end
 
-	---@param subset type-track.Operator
-	---@param superset type-track.Operator
+	---@param subset type-track.Operation
+	---@param superset type-track.Operation
 	---@return boolean
-	function Operator.is_subset(subset, superset)
+	function Operation.is_subset(subset, superset)
 		return subset.op == superset.op
 			and is_subset(superset.domain, subset.domain)
 			and is_subset(subset.range, superset.range)
@@ -588,7 +588,7 @@ do -- Operator
 	---@param op string
 	---@param domain type-track.Type
 	---@return type-track.Type? range
-	function OperatorInst:eval(op, domain)
+	function OperationInst:eval(op, domain)
 		if op ~= self.op then
 			return nil
 		end
@@ -602,7 +602,7 @@ do -- Operator
 
 	---@param op string
 	---@return type-track.Type? domain
-	function OperatorInst:get_domain(op)
+	function OperationInst:get_domain(op)
 		if op == self.op then
 			return self.domain
 		else
@@ -612,7 +612,7 @@ do -- Operator
 
 	---@param visited { [type-track.Type]: true? }
 	---@return type-track.Type?
-	function OperatorInst:_unify(visited)
+	function OperationInst:_unify(visited)
 		local domain = self.domain:unify(visited)
 		if not domain then
 			return nil
@@ -623,12 +623,12 @@ do -- Operator
 			return nil
 		end
 
-		return Operator(self.op, domain, range)
+		return Operation(self.op, domain, range)
 	end
 
 	---@param visited { [type-track.Type]: number?, n: number }
 	---@return string
-	function OperatorInst:repr(visited)
+	function OperationInst:repr(visited)
 		return string.format(
 			"{ %s: %s -> %s }",
 			self.op,
@@ -1383,31 +1383,31 @@ do -- Never
 	Never = NeverClass()
 end
 
-do -- GenericOperator
-	---@class type-track.GenericOperator : type-track.Type
+do -- GenericOperation
+	---@class type-track.GenericOperation : type-track.Type
 	---@field op string
-	---@field derive_fn type-track.GenericOperator.derive_fn
-	---@field infer_fn type-track.GenericOperator.infer_fn
+	---@field derive_fn type-track.GenericOperation.derive_fn
+	---@field infer_fn type-track.GenericOperation.infer_fn
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator add(type-track.Type): type-track.Union
-	local GenericOperatorInst = muun("GenericOperator", Type)
+	local GenericOperationInst = muun("GenericOperation", Type)
 
-	GenericOperator = GenericOperatorInst --[[@as type-track.GenericOperator.Class]]
+	GenericOperation = GenericOperationInst --[[@as type-track.GenericOperation.Class]]
 
-	---@param self type-track.GenericOperator
+	---@param self type-track.GenericOperation
 	---@param op string
-	---@param derive_fn type-track.GenericOperator.derive_fn
-	---@param infer_fn type-track.GenericOperator.infer_fn
-	function GenericOperator:new(op, derive_fn, infer_fn)
+	---@param derive_fn type-track.GenericOperation.derive_fn
+	---@param infer_fn type-track.GenericOperation.infer_fn
+	function GenericOperation:new(op, derive_fn, infer_fn)
 		self.op = op
 		self.derive_fn = derive_fn
 		self.infer_fn = infer_fn
 	end
 
-	---@param subset type-track.GenericOperator
-	---@param superset type-track.GenericOperator
+	---@param subset type-track.GenericOperation
+	---@param superset type-track.GenericOperation
 	---@return boolean
-	function GenericOperator.is_subset(subset, superset)
+	function GenericOperation.is_subset(subset, superset)
 		local subset_domain, subset_range = subset.derive_fn(unknown_var)
 		if not subset_domain or not subset_range then
 			return false
@@ -1426,7 +1426,7 @@ do -- GenericOperator
 	---@param op string
 	---@param domain type-track.Type
 	---@return type-track.Type? range
-	function GenericOperatorInst:eval(op, domain)
+	function GenericOperationInst:eval(op, domain)
 		if op ~= self.op then
 			return nil
 		end
@@ -1446,7 +1446,7 @@ do -- GenericOperator
 
 	---@param op string
 	---@return type-track.Type? domain
-	function GenericOperatorInst:get_domain(op)
+	function GenericOperationInst:get_domain(op)
 		if op ~= self.op then
 			return nil
 		end
@@ -1455,14 +1455,14 @@ do -- GenericOperator
 		return self_domain
 	end
 
-	---returns a concrete `Operator` that is a subset of `superset` for this
+	---returns a concrete `Operation` that is a subset of `superset` for this
 	---type's `op`
 	---
 	---If `nil` is returned, then `supertype` could not be matched for this
 	---operator.
 	---@param superset type-track.Type
 	---@return type-track.Type? concrete
-	function GenericOperatorInst:match(superset)
+	function GenericOperationInst:match(superset)
 		local super_domain = superset:get_domain(self.op)
 		if not super_domain then
 			return nil
@@ -1479,11 +1479,11 @@ do -- GenericOperator
 			return nil
 		end
 
-		return Operator(self.op, self_domain, self_range)
+		return Operation(self.op, self_domain, self_range)
 	end
 
 	---@param visited { [type-track.Type]: number?, n: number }
-	function GenericOperatorInst:__tostring(visited)
+	function GenericOperationInst:__tostring(visited)
 		visited = visited or { n = 0 }
 		return string.format(
 			"{ %s(): %s }",
@@ -1494,14 +1494,14 @@ do -- GenericOperator
 end
 
 meta.Tuple = Tuple
-meta.Operator = Operator
+meta.Operation = Operation
 meta.Union = Union
 meta.Intersection = Intersection
 meta.Literal = Literal
 meta.Free = Free
 meta.Never = Never
 meta.Unknown = Unknown
-meta.GenericOperator = GenericOperator
+meta.GenericOperation = GenericOperation
 
 meta.Type = Type
 

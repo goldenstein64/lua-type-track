@@ -1,6 +1,6 @@
 import
 	is_subset
-	Type, Tuple, Literal, Intersection, Never, Operator, Free
+	Type, Tuple, Literal, Intersection, Never, Operation, Free
 from require 'type-track.meta'
 
 memoize = (f) ->
@@ -49,8 +49,8 @@ describe 'Intersection', ->
 				assert.equal "A", elem2.value
 
 		it 'simplifies subset operators', ->
-			op1 = Operator 'call', A, C
-			op2 = Operator 'call', (Tuple { A, B }), C
+			op1 = Operation 'call', A, C
+			op2 = Operation 'call', (Tuple { A, B }), C
 
 			-- assuming op1 is a subset of op2,
 			assert.is_true is_subset op1, op2
@@ -63,7 +63,7 @@ describe 'Intersection', ->
 			assert.is_true is_subset unified, op1
 
 		it 'works with order-1 cyclic intersections', ->
-			op = Operator 'call', A, B
+			op = Operation 'call', A, B
 
 			inter = Free!
 			inter.value = Intersection { op, op, inter }
@@ -79,14 +79,14 @@ describe 'Intersection', ->
 			_string = Free!
 			number = Free!
 
-			number.value = Operator "add", number, number
+			number.value = Operation "add", number, number
 			number.value.unified = number.value -- already unified
 
 			string_of = memoize (value) -> Literal value, _string
-			concat_call = Operator "concat", _string + number, _string
+			concat_call = Operation "concat", _string + number, _string
 
 			_string.value = Intersection {
-				Operator "type", Never, string_of "string"
+				Operation "type", Never, string_of "string"
 				concat_call
 			}
 

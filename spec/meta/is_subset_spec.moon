@@ -1,6 +1,6 @@
 import
 	is_subset
-	Type, Tuple, Operator, Literal, GenericOperator, Unknown
+	Type, Tuple, Operation, Literal, GenericOperation, Unknown
 from require 'type-track.meta'
 
 empty = Tuple {}
@@ -18,8 +18,8 @@ describe 'is_subset', ->
 		assert.is_true is_subset A * B, A
 
 	it 'accepts { A: A, B: B } <: { A: A }', ->
-		index_a = Operator 'index', A, A
-		index_b = Operator 'index', B, B
+		index_a = Operation 'index', A, A
+		index_b = Operation 'index', B, B
 
 		sub_t = index_a * index_b
 		super_t = index_a
@@ -27,8 +27,8 @@ describe 'is_subset', ->
 		assert.is_true is_subset sub_t, super_t
 
 	it 'accepts ({ A: A, B: B }, { A: A, B: B }) <: { A: A }', ->
-		index_a = Operator 'index', A, A
-		index_b = Operator 'index', B, B
+		index_a = Operation 'index', A, A
+		index_b = Operation 'index', B, B
 
 		-- type SUB = read { A: "A", B: "B" }
 		sub_t = index_a * index_b
@@ -49,8 +49,8 @@ describe 'is_subset', ->
 		assert.is_true is_subset ab_type, x_type
 
 	it 'accepts { call: A -> () } <: { call(T): T -> () }', ->
-		type1 = Operator 'call', A, empty
-		type2 = GenericOperator(
+		type1 = Operation 'call', A, empty
+		type2 = GenericOperation(
 			'call'
 			(type_params) ->
 				T = type_params\at 1
@@ -64,8 +64,8 @@ describe 'is_subset', ->
 		assert.is_true is_subset type1, type2
 
 	it 'accepts { call(T): () -> T } <: { call: () -> A }', ->
-		type1 = Operator 'call', empty, A
-		type2 = GenericOperator(
+		type1 = Operation 'call', empty, A
+		type2 = GenericOperation(
 			'call'
 			(type_params) ->
 				T = type_params\at 1
@@ -79,8 +79,8 @@ describe 'is_subset', ->
 		assert.is_true is_subset type2, type1
 
 	it 'accepts { call: A -> A } <: { call(T): T -> T }', ->
-		type1 = Operator 'call', A, A
-		type2 = GenericOperator(
+		type1 = Operation 'call', A, A
+		type2 = GenericOperation(
 			'call'
 			(type_params) ->
 				T = type_params\at 1

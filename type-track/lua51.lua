@@ -1,15 +1,15 @@
 local meta_types = require("type-track.meta")
 local muun = require("type-track.muun")
 
-local Type, Tuple, Operator, Literal, Free, Never, Unknown, GenericOperator =
+local Type, Tuple, Operation, Literal, Free, Never, Unknown, GenericOperation =
 	meta_types.Type,
 	meta_types.Tuple,
-	meta_types.Operator,
+	meta_types.Operation,
 	meta_types.Literal,
 	meta_types.Free,
 	meta_types.Never,
 	meta_types.Unknown,
-	meta_types.GenericOperator
+	meta_types.GenericOperation
 
 ---@generic F
 ---@param f F
@@ -43,56 +43,56 @@ local function string_of(value)
 end
 string_of = memoize(string_of)
 
-local _nil = Operator("type", Never, string_of("nil"))
-	* Operator("truthy", Never, _false)
+local _nil = Operation("type", Never, string_of("nil"))
+	* Operation("truthy", Never, _false)
 
-local thread = Operator("type", Never, string_of("thread"))
-local userdata = Operator("type", Never, string_of("userdata"))
+local thread = Operation("type", Never, string_of("thread"))
+local userdata = Operation("type", Never, string_of("userdata"))
 
 local string_or_num = _string + number
-local concat_call = Operator("concat", string_or_num, _string)
+local concat_call = Operation("concat", string_or_num, _string)
 
 local unknown_var = T({}, Unknown)
 
-local function_type = Operator("type", Never, string_of("function"))
-local _function = function_type * Operator("call", unknown_var, unknown_var)
+local function_type = Operation("type", Never, string_of("function"))
+local _function = function_type * Operation("call", unknown_var, unknown_var)
 
-local boolean = Operator("type", Never, string_of("boolean"))
+local boolean = Operation("type", Never, string_of("boolean"))
 
 local _true = Literal(true, boolean)
-_false.value = Literal(false, boolean * Operator("truthy", Never, _false))
+_false.value = Literal(false, boolean * Operation("truthy", Never, _false))
 
-_string.value = Operator("type", Never, string_of("string"))
+_string.value = Operation("type", Never, string_of("string"))
 	* concat_call
 	* stringlib
 
-number.value = Operator("type", Never, string_of("number"))
-	* Operator("add", number, number)
-	* Operator("sub", number, number)
-	* Operator("mul", number, number)
-	* Operator("div", number, number)
-	* Operator("mod", number, number)
-	* Operator("pow", number, number)
+number.value = Operation("type", Never, string_of("number"))
+	* Operation("add", number, number)
+	* Operation("sub", number, number)
+	* Operation("mul", number, number)
+	* Operation("div", number, number)
+	* Operation("mod", number, number)
+	* Operation("pow", number, number)
 	* concat_call
 
-local _table = Operator("type", Never, string_of("table"))
-	* Operator("index", Unknown, Unknown)
-	* Operator("newindex", T({ Unknown, Unknown }), Never)
-	* Operator("len", Never, number)
+local _table = Operation("type", Never, string_of("table"))
+	* Operation("index", Unknown, Unknown)
+	* Operation("newindex", T({ Unknown, Unknown }), Never)
+	* Operation("len", Never, number)
 
 ---@param params type-track.Type
 ---@param returns type-track.Type
 ---@return type-track.Type func
 local function func(params, returns)
-	return function_type * Operator("call", params, returns)
+	return function_type * Operation("call", params, returns)
 end
 
----@param derive_fn type-track.GenericOperator.derive_fn
----@param infer_fn type-track.GenericOperator.infer_fn
+---@param derive_fn type-track.GenericOperation.derive_fn
+---@param infer_fn type-track.GenericOperation.infer_fn
 ---@return type-track.Type func
 local function gen_func(derive_fn, infer_fn)
-	return Operator("type", Never, string_of("function"))
-		* GenericOperator("call", derive_fn, infer_fn)
+	return Operation("type", Never, string_of("function"))
+		* GenericOperation("call", derive_fn, infer_fn)
 end
 
 local num2_to_num = func(T({ number, number }), number)
@@ -104,19 +104,19 @@ local string_or_num_var = T({}, string_or_num)
 ---@param t type-track.Type
 ---@return type-track.Type
 local function array_of(t)
-	return Operator("type", Never, string_of("table"))
-		* Operator("index", number, t)
-		* Operator("newindex", T({ number, t }), Never)
+	return Operation("type", Never, string_of("table"))
+		* Operation("index", number, t)
+		* Operation("newindex", T({ number, t }), Never)
 end
 
 ---@param tab { [string]: type-track.Type }
 ---@return type-track.Type
 local function lib(tab)
 	---@type type-track.Type
-	local result = Operator("type", Never, string_of("table"))
-		* Operator("newindex", T({ Unknown, Unknown }), Never)
+	local result = Operation("type", Never, string_of("table"))
+		* Operation("newindex", T({ Unknown, Unknown }), Never)
 	for k, v in pairs(tab) do
-		result = result * Operator("index", string_of(k), v)
+		result = result * Operation("index", string_of(k), v)
 	end
 
 	return result
@@ -269,7 +269,7 @@ local iolib = lib({
 })
 
 file.value = userdata
-	* Operator("iolib.type", Never, string_of("file") + string_of("closed file"))
+	* Operation("iolib.type", Never, string_of("file") + string_of("closed file"))
 	* lib({
 		close = func(file, true_or_fail),
 		flush = func(file, true_or_fail),

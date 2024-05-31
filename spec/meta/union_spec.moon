@@ -1,6 +1,6 @@
 import
 	is_subset
-	Literal, Union, Type, Unknown, Free, Operator
+	Literal, Union, Type, Unknown, Free, Operation
 from require 'type-track.meta'
 
 describe 'Union', ->
@@ -40,7 +40,7 @@ describe 'Union', ->
 				assert.equal "A", elem2.value
 
 		it 'works with order-1 cyclic unions', ->
-			op = Operator 'call', A, B
+			op = Operation 'call', A, B
 
 			union = Free!
 			union.value = Union { op, op, union }
@@ -55,7 +55,7 @@ describe 'Union', ->
 			op = Free!
 			union = Free!
 
-			op.value = Operator "some", A, union
+			op.value = Operation "some", A, union
 			union.value = Union { op, B }
 
 			unified_union = union\unify!
