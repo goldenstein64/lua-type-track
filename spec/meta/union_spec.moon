@@ -1,4 +1,7 @@
-import Literal, Union, Type, Unknown from require 'type-track.meta'
+import
+	is_subset
+	Literal, Union, Type, Unknown, Free, Operator
+from require 'type-track.meta'
 
 describe 'Union', ->
 	A = Literal 'A'
@@ -30,8 +33,31 @@ describe 'Union', ->
 
 			assert.equal 2, #unified.types
 			{ elem1, elem2 } = unified.types
-			assert.is_true elem1 == A or elem1 == B
-			if elem1 == A
-				assert.equal B, elem2
-			elseif elem1 == B
-				assert.equal A, elem2
+			assert.is_true elem1.value == "A" or elem1.value == "B"
+			if elem1.value == "A"
+				assert.equal "B", elem2.value
+			elseif elem1.value == "B"
+				assert.equal "A", elem2.value
+
+		it 'works with order-1 cyclic unions', ->
+			op = Operator 'call', A, B
+
+			union = Free!
+			union.value = Union { op, op, union }
+
+			expected = op
+			unified = union\unify!
+			assert.not_nil unified
+			assert.is_true is_subset expected, unified
+			assert.is_true is_subset unified, expected
+
+		it 'returns nil for order-2 cyclic unions', ->
+			op = Free!
+			union = Free!
+
+			op.value = Operator "some", A, union
+			union.value = Union { op, B }
+
+			unified_union = union\unify!
+
+			assert.is_nil unified_union

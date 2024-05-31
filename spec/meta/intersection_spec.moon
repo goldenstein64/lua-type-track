@@ -1,7 +1,17 @@
 import
 	is_subset
-	Type, Tuple, Literal, Intersection, Never, Operator
+	Type, Tuple, Literal, Intersection, Never, Operator, Free
 from require 'type-track.meta'
+
+memoize = (f) ->
+	cache = {}
+	(a, ...) ->
+		r = cache[a]
+		if r == nil
+			r = f a, ...
+			cache[a] = r
+
+		r
 
 describe 'Intersection', ->
 	A = Literal 'A'
@@ -32,11 +42,11 @@ describe 'Intersection', ->
 
 			assert.equal 2, #unified.types
 			{ elem1, elem2 } = unified.types
-			assert.is_true elem1 == A or elem1 == B
-			if elem1 == A
-				assert.equal B, elem2
-			elseif elem1 == B
-				assert.equal A, elem2
+			assert.is_true elem1.value == "A" or elem1.value == "B"
+			if elem1.value == "A"
+				assert.equal "B", elem2.value
+			elseif elem1.value == "B"
+				assert.equal "A", elem2.value
 
 		it 'simplifies subset operators', ->
 			op1 = Operator 'call', A, C
@@ -51,3 +61,34 @@ describe 'Intersection', ->
 			-- unifying should return the subset, i.e. op1
 			assert.is_true is_subset op1, unified
 			assert.is_true is_subset unified, op1
+
+		it 'works with order-1 cyclic intersections', ->
+			op = Operator 'call', A, B
+
+			inter = Free!
+			inter.value = Intersection { op, op, inter }
+
+			expected = op
+
+			unified = inter\unify!
+			assert.not_nil unified
+			assert.is_true is_subset unified, expected
+			assert.is_true is_subset expected, unified
+
+		it 'returns nil for order-2 cyclic intersections', ->
+			_string = Free!
+			number = Free!
+
+			number.value = Operator "add", number, number
+			number.value.unified = number.value -- already unified
+
+			string_of = memoize (value) -> Literal value, _string
+			concat_call = Operator "concat", _string + number, _string
+
+			_string.value = Intersection {
+				Operator "type", Never, string_of "string"
+				concat_call
+			}
+
+			assert.is_nil concat_call\unify!
+			assert.is_nil _string\unify!

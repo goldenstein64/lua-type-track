@@ -132,8 +132,24 @@ local function is_subset(subset, superset)
 		return true
 	end
 
-	subset = subset:unify()
-	superset = superset:unify()
+	do
+		local unified = subset:unify()
+		if not unified then
+			return false
+		end
+		subset = unified
+	end
+	if not subset then
+		return false
+	end
+
+	do
+		local unified = superset:unify()
+		if not unified then
+			return false
+		end
+		superset = unified
+	end
 
 	if rawequal(subset, superset) then
 		return true
@@ -379,35 +395,55 @@ do -- Type
 		return i == 1 and self or nil
 	end
 
-	---converts a type into its simplest form. It always returns a new `Type`.
+	---converts a type into its simplest form.
+	---
+	---- If unification failed, it returns `nil`.
+	---- Otherwise, it returns a `Type`. It may be itself if it was already
+	---  unified.
 	---
 	---Note: If you plan to change the behavior of this method, override
 	---`Type:_unify()`.
-	---@return type-track.Type
-	function TypeInst:unify()
+	---@param visited? { [type-track.Type]: true? }
+	---@return type-track.Type?
+	function TypeInst:unify(visited)
 		if self.unified then
 			return self.unified
 		end
 
-		local proxy = Free()
-		proxy.unified = proxy
-		self.unified = proxy
-		local result = self:_unify()
-		proxy.value = result
-		proxy.unified = result
+		if not visited then
+			visited = {}
+		elseif visited[self] then
+			return nil
+		end
+
+		visited[self] = true
+
+		local result = self:_unify(visited)
+		if not result then
+			return nil
+		end
+
 		self.unified = result
+		result.unified = result
+
 		return result
 	end
 
 	---defines the algorithm for converting a type into its simplest form. This
 	---is a protected method that implements `Type:unify()`. It must always
-	---return a new Type unless it is already in its simplest form.
+	---return either a Type or nil.
+	---
+	---- If the type is already in its simplest form, it can return itself, but
+	---  it's not required.
+	---- If unification failed, it returns `nil`.
+	---- Otherwise, it returns a new Type.
 	---
 	---The public method makes sure to call `_unify` only when the type hasn't
 	---been unified before and sets `unified` to a proxy `Free` type before
 	---calling.
-	---@return type-track.Type unified
-	function TypeInst:_unify()
+	---@param visited { [type-track.Type]: true? }
+	---@return type-track.Type? unified
+	function TypeInst:_unify(visited)
 		return self
 	end
 
@@ -584,8 +620,20 @@ do -- Operator
 		end
 	end
 
-	function OperatorInst:_unify()
-		return Operator(self.op, self.domain:unify(), self.range:unify())
+	---@param visited { [type-track.Type]: true? }
+	---@return type-track.Type?
+	function OperatorInst:_unify(visited)
+		local domain = self.domain:unify(visited)
+		if not domain then
+			return nil
+		end
+
+		local range = self.range:unify(visited)
+		if not range then
+			return nil
+		end
+
+		return Operator(self.op, domain, range)
 	end
 
 	---@param visited { [type-track.Type]: number?, n: number }
@@ -707,8 +755,9 @@ do -- Tuple
 		end
 	end
 
-	---@return type-track.Type
-	function TupleInst:_unify()
+	---@param visited { [type-track.Type]: true? }
+	---@return type-track.Type?
+	function TupleInst:_unify(visited)
 		-- empty tuples are equivalent to Never
 		if #self.types == 0 and not self.var_arg then
 			return Never
@@ -716,15 +765,23 @@ do -- Tuple
 
 		local unified_args = {}
 		for i, elem in ipairs(self.types) do
-			unified_args[i] = elem:unify()
+			local unified = elem:unify(visited)
+			if not unified then
+				return nil
+			end
+
+			unified_args[i] = unified
 		end
 
-		local unified_var_args = nil
+		local unified_var_arg = nil
 		if self.var_arg then
-			unified_var_args = self.var_arg:unify()
+			unified_var_arg = self.var_arg:unify(visited)
+			if not unified_var_arg then
+				return nil
+			end
 		end
 
-		return Tuple(unified_args, unified_var_args)
+		return Tuple(unified_args, unified_var_arg)
 	end
 
 	local VAR_STR = "...%s"
@@ -844,29 +901,49 @@ do -- Union
 		table.insert(union, elem)
 	end
 
+	---@param self type-track.Union
 	---@param types type-track.Type[]
-	local function flatten_union(types)
+	---@param visited { [type-track.Type]: true? }
+	---@return type-track.Type?
+	local function flatten_union(self, types, visited)
 		local result = {} ---@type type-track.Type[]
 		for _, elem in ipairs(types) do
-			elem = elem:unify()
-			if elem == Unknown then
+			if elem.__class == Free then
+				---@cast elem type-track.Free
+				elem = elem:unwrap()
+			end
+
+			if rawequal(elem, self) then
+				-- A | A = A, so we can skip itself
+				goto continue
+			end
+			local unified = elem:unify(visited)
+			if not unified then
+				return nil
+			elseif unified == Unknown then
 				return { Unknown }
-			elseif elem.__class == Union then
-				---@cast elem type-track.Union
-				for _, sub_elem in ipairs(elem.types) do
+			elseif unified.__class == Union then
+				---@cast unified type-track.Union
+				for _, sub_elem in ipairs(unified.types) do
 					union_insert(result, sub_elem)
 				end
 			else
-				union_insert(result, elem)
+				union_insert(result, unified)
 			end
+
+			::continue::
 		end
 
 		return result
 	end
 
-	---@return type-track.Type
-	function UnionInst:_unify()
-		local flattened = flatten_union(self.types)
+	---@param visited { [type-track.Type]: true? }
+	---@return type-track.Type?
+	function UnionInst:_unify(visited)
+		local flattened = flatten_union(self, self.types, visited)
+		if not flattened then
+			return nil
+		end
 
 		assert(#flattened > 0, "no types to unify?")
 		if #flattened == 1 then
@@ -1023,54 +1100,75 @@ do -- Intersection
 		table.insert(intersection, elem)
 	end
 
+	---@param self type-track.Intersection
 	---@param types type-track.Type[]
-	---@return type-track.Type[]
-	local function flatten_intersection(types)
+	---@param visited { [type-track.Type]: true? }
+	---@return type-track.Type[]? flattened
+	local function flatten_intersection(self, types, visited)
 		local result = {} ---@type type-track.Type[]
 		for _, elem in ipairs(types) do
-			elem = elem:unify()
-			if elem == Never then
+			if elem.__class == Free then
+				---@cast elem type-track.Free
+				elem = elem:unwrap()
+			end
+
+			if rawequal(elem, self) then
+				-- A & A = A, so we can skip itself
+				goto continue
+			end
+
+			local unified = elem:unify(visited)
+			if not unified then
+				return nil
+			elseif unified == Never then
 				return { Never }
-			elseif elem.__class == Intersection then
-				---@cast elem type-track.Intersection
-				for _, sub_elem in ipairs(elem.types) do
+			elseif unified.__class == Intersection then
+				---@cast unified type-track.Intersection
+				for _, sub_elem in ipairs(unified.types) do
+					-- `sub_elem` is already unified here, because that's what
+					-- `Intersection:unify()` does
 					intersection_insert(result, sub_elem)
 				end
 			else
-				intersection_insert(result, elem)
+				intersection_insert(result, unified)
 			end
+			::continue::
 		end
 
 		return result
 	end
 
-	---takes all the types that are to be intersected and returns all the types
-	---that are to be unioned
+	-- since unions are more prevalent, intersections should look for unions in
+	-- their sub-elements and push them to the top of the type expression
+	-- - `A & (B | C)` -> `(A & B) | (A & C)`
+	-- - `(A | B) & (C | D)` -> `(A & C) | (A & D) | (B & C) | (B & D)`
 	---@param types type-track.Type[]
-	---@return type-track.Type[]
-	local function distribute_unions(types)
+	---@param visited { [type-track.Type]: true? }
+	---@return type-track.Type? distributed
+	local function distribute_unions(types, visited)
 		local all_unions = {} ---@type type-track.Type[][]
 		local has_unions = false
-		for _, type in ipairs(types) do
-			if type.__class == Free then
-				---@cast type type-track.Free
-				type = type:unwrap()
-			end
+		for i, elem in ipairs(types) do
+			assert(elem.__class ~= Free, "Free type found while distributing unions")
 
-			if type.__class == Union then
-				---@cast type type-track.Union
-				table.insert(all_unions, type.types)
+			if elem.__class == Union then
+				---@cast elem type-track.Union
+				table.insert(all_unions, elem.types)
 				has_unions = true
 			else
-				table.insert(all_unions, { type })
+				table.insert(all_unions, i) -- insert the index into `all_unions`
 			end
 		end
 
 		if not has_unions then
-			if #types == 1 then
-				return types[1]
-			else
-				return Intersection(types)
+			-- `types` is already unified here by `flatten_intersection`
+			return Intersection(types)
+		end
+
+		-- turn all indexes into their corresponding values from `types`
+		for i, union in ipairs(all_unions) do
+			if type(union) == "number" then
+				all_unions[i] = { types[i] }
 			end
 		end
 
@@ -1080,33 +1178,22 @@ do -- Intersection
 			table.insert(result, Intersection(permutation))
 		end
 
-		return Union(result):unify()
+		return Union(result):unify(visited)
 	end
 
-	-- since unions are more prevalent, intersections should look for unions in
-	-- their sub-elements and push them to the top of the type expression
-	-- A & (B | C) -> (A & B) | (A & C)
-	-- (A | B) & (C | D) -> (A & C) | (A & D) | (B & C) | (B & D)
-	-- (...union1) & (...union2) & ... & (unionN)
-	--   -> (union1[1] & union2[1] & ... & unionN[1])
-	--    | (union1[1] & union2[1] & ... & unionN[2])
-	--    | ...
-	--    | (union1[1] & union2[1] & ... & unionN[nn])
-	--    | (union1[1] & union2[1] & ... & unionN_1[2] & unionN[1])
-	--    | (union1[1] & union2[1] & ... & unionN_1[2] & unionN[2])
-	--    | ...
-	--    | (union1[1] & union2[1] & ... & unionN_1[2] & unionN[n])
-	--    | ...
-	--    | (union1[n1] & union2[n2] & ... & unionN[nn])
-	---@return type-track.Type
-	function IntersectionInst:_unify()
-		local flattened = flatten_intersection(self.types)
+	---@param visited { [type-track.Type]: true? }
+	---@return type-track.Type?
+	function IntersectionInst:_unify(visited)
+		local flattened = flatten_intersection(self, self.types, visited)
+		if not flattened then
+			return nil
+		end
 		assert(#flattened > 0, "no types to unify?")
 		if #flattened == 1 then
 			return flattened[1]
 		end
 
-		return distribute_unions(flattened)
+		return distribute_unions(flattened, visited)
 	end
 
 	---@param visited { [type-track.Type]: number?, n: number }
@@ -1150,14 +1237,25 @@ do -- Literal
 	---@param op string
 	---@param domain type-track.Type
 	---@return type-track.Type? range
-	function Literal:eval(op, domain)
+	function LiteralInst:eval(op, domain)
 		return self.ops:eval(op, domain)
 	end
 
 	---@param op string
 	---@return type-track.Type? domain
-	function Literal:get_domain(op)
+	function LiteralInst:get_domain(op)
 		return self.ops:get_domain(op)
+	end
+
+	---@param visited? { [type-track.Type]: true? }
+	---@return type-track.Type?
+	function LiteralInst:_unify(visited)
+		local unified_ops = self.ops:unify(visited)
+		if not unified_ops then
+			return nil
+		end
+
+		return Literal(self.value, unified_ops)
 	end
 
 	---@param visited { [type-track.Type]: number?, n: number }
@@ -1178,11 +1276,14 @@ do -- Free
 
 	---@return type-track.Type
 	function FreeInst:unwrap()
+		local visited = { [self] = true } --- @type { [type-track.Type]: true? }
 		local result = self ---@type type-track.Type
 
 		while result.__class == Free do
 			---@cast result type-track.Free
 			result = assert(result.value, "attempt to use an empty Free type")
+			assert(not visited[result], "Free type is cyclic")
+			visited[result] = true
 		end
 
 		return result
@@ -1203,7 +1304,7 @@ do -- Free
 		return self:unwrap():at(...)
 	end
 
-	---@return type-track.Type
+	---@return type-track.Type?
 	function FreeInst:unify(...)
 		if self.unified then
 			return self.unified
@@ -1224,6 +1325,7 @@ do -- Free
 			---@cast val type-track.Free
 			val = val.value
 		end
+
 		if val then
 			return tostring(val)
 		else
