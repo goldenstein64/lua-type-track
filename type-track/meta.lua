@@ -1,4 +1,5 @@
 ---a collection of classes describing how all types are constructed
+local meta = {}
 
 local muun = require("type-track.muun")
 local Inheritable = require("type-track.Inheritable")
@@ -127,6 +128,10 @@ local any_are_subset
 local function is_subset(subset, superset)
 	-- If both types have the same class, their respective compare method is
 	-- used. Otherwise, coerce the types to something else and compare that?
+
+	if meta.DEBUG then
+		print(subset, "<:", superset)
+	end
 
 	if rawequal(subset, superset) then
 		return true
@@ -1488,18 +1493,18 @@ do -- GenericOperator
 	end
 end
 
-return {
-	Tuple = Tuple,
-	Operator = Operator,
-	Union = Union,
-	Intersection = Intersection,
-	Literal = Literal,
-	Free = Free,
-	Never = Never,
-	Unknown = Unknown,
-	GenericOperator = GenericOperator,
+meta.Tuple = Tuple
+meta.Operator = Operator
+meta.Union = Union
+meta.Intersection = Intersection
+meta.Literal = Literal
+meta.Free = Free
+meta.Never = Never
+meta.Unknown = Unknown
+meta.GenericOperator = GenericOperator
 
-	Type = Type,
+meta.Type = Type
 
-	is_subset = is_subset,
-}
+meta.is_subset = is_subset
+
+return meta

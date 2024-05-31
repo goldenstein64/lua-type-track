@@ -91,8 +91,9 @@ describe 'is_subset', ->
 			(domain) -> domain\at 1
 		)
 
-		-- _G.DEBUG = true
+		-- meta.DEBUG = true
 		assert.is_true is_subset type2, type1
+		-- meta.DEBUG = false
 
 	it 'accepts A | (B & C) == (A | B) & (A | C)', ->
 		type1 = (A + (B * C))
