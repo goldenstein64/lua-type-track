@@ -748,10 +748,7 @@ do -- Tuple
 	---@param visited { [type-track.Type]: true? }
 	---@return type-track.Type?
 	function TupleInst:_unify(visited)
-		-- empty tuples are equivalent to Never
-		if #self.types == 0 and not self.var_arg then
-			return Never
-		end
+		-- 0 values is NOT the same as nothing at all
 
 		local unified_args = {}
 		for i, elem in ipairs(self.types) do
