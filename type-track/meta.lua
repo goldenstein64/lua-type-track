@@ -402,9 +402,10 @@ do -- Type
 
 	---converts a type into its simplest form.
 	---
-	---- If unification failed, it returns `nil`.
-	---- Otherwise, it returns a `Type`. It may be itself if it was already
-	---  unified.
+	---- If unification succeeds, it returns a `Type`. It may be itself if it was
+	---  already unified.
+	---
+	---- Otherwise, it returns `nil`. Typically, this means the type is invalid.
 	---
 	---Note: If you plan to change the behavior of this method, override
 	---`Type:_unify()`.
@@ -436,16 +437,16 @@ do -- Type
 
 	---defines the algorithm for converting a type into its simplest form. This
 	---is a protected method that implements `Type:unify()`. It must always
-	---return either a Type or nil.
+	---return either a `Type` or `nil`.
 	---
 	---- If the type is already in its simplest form, it can return itself, but
 	---  it's not required.
-	---- If unification failed, it returns `nil`.
-	---- Otherwise, it returns a new Type.
+	---- If unification succeeds, it returns a new `Type`.
+	---- Otherwise, it returns `nil`.
 	---
 	---The public method makes sure to call `_unify` only when the type hasn't
-	---been unified before and sets `unified` to a proxy `Free` type before
-	---calling.
+	---been unified before and the type wasn't already visited during a parent
+	---unification.
 	---@param visited { [type-track.Type]: true? }
 	---@return type-track.Type? unified
 	function TypeInst:_unify(visited)
@@ -581,8 +582,8 @@ do -- Operation
 	---@return boolean
 	function Operation.is_subset(subset, superset)
 		return subset.op == superset.op
-			and is_subset(superset.domain, subset.domain)
-			and is_subset(subset.range, superset.range)
+				and is_subset(superset.domain, subset.domain)
+				and is_subset(subset.range, superset.range)
 	end
 
 	---@param op string
@@ -748,25 +749,54 @@ do -- Tuple
 	---@param visited { [type-track.Type]: true? }
 	---@return type-track.Type?
 	function TupleInst:_unify(visited)
+		local has_args = #self.types > 0
+		local self_var_arg = self.var_arg
 		-- 0 values is NOT the same as Never
 		-- but a unit tuple unifies to itself
-		if #self.types == 0 and not self.var_arg then
+		if not has_args and not self_var_arg then
 			return self
 		end
 
-		local unified_args = {}
-		for i, elem in ipairs(self.types) do
-			local unified = elem:unify(visited)
-			if not unified then
+		local unified_args = {} ---@type type-track.Type[]
+		local unified_var_arg = nil ---@type type-track.Type?
+		if has_args then
+			for i = 1, #self.types - 1 do
+				local elem = self.types[i]
+				local unified = elem:unify(visited)
+				if not unified then
+					return nil
+				end
+
+				unified_args[i] = unified:at(1)
+			end
+
+			local last_elem = self.types[#self.types]
+			local last_unified = last_elem:unify(visited)
+			if not last_unified then
 				return nil
 			end
 
-			unified_args[i] = unified
+			if last_unified.__class == Tuple then
+				---@cast last_unified type-track.Tuple
+				local last_var_arg = last_unified.var_arg
+				if self_var_arg and last_var_arg then
+					if not is_subset(last_var_arg, self_var_arg) then
+						return nil
+					end
+				elseif last_var_arg then
+					unified_var_arg = last_var_arg
+				end
+
+				for _, sub_elem in ipairs(last_unified.types) do
+					table.insert(unified_args, sub_elem)
+				end
+			else
+				table.insert(unified_args, last_unified)
+			end
 		end
 
-		local unified_var_arg = nil
-		if self.var_arg then
-			unified_var_arg = self.var_arg:unify(visited)
+		if self_var_arg then
+			unified_var_arg = self_var_arg:unify(visited)
 			if not unified_var_arg then
 				return nil
 			end
@@ -1222,7 +1252,7 @@ do -- Literal
 	---@return boolean
 	function Literal.is_subset(subset, superset)
 		return subset.value == superset.value
-			and is_subset(subset.ops, superset.ops)
+				and is_subset(subset.ops, superset.ops)
 	end
 
 	---@param op string
@@ -1420,8 +1450,8 @@ do -- GenericOperation
 		end
 
 		return subset.op == superset.op
-			and is_subset(subset_domain, superset_domain)
-			and is_subset(superset_range, subset_range)
+				and is_subset(subset_domain, superset_domain)
+				and is_subset(superset_range, subset_range)
 	end
 
 	---@param op string

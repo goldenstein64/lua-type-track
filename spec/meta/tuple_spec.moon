@@ -1,4 +1,9 @@
-import Type, Tuple, Literal, Unknown, Never from require 'type-track.meta'
+import
+	is_subset
+	Type, Tuple, Literal, Unknown, Never 
+from require 'type-track.meta'
+
+is_equiv = (a, b) -> (is_subset a, b) and (is_subset b, a)
 
 describe 'Tuple', ->
 	it 'is a Type', ->
@@ -96,7 +101,40 @@ describe 'Tuple', ->
 			assert.equal nil, tup\at 3
 
 	describe 'unify', ->
-		it 'returns Never when empty', ->
+		it 'returns itself when empty', ->
 			tup = Tuple {}
 
-			assert.equal Never, tup\unify!
+			assert.equal tup, tup\unify!
+
+		it 'truncates middle tuples', ->
+			tup = Tuple { A, (Tuple { A, B }), C }
+
+			unified = tup\unify!
+			assert.equal "A", unified\at(1).value
+			assert.equal "A", unified\at(2).value
+			assert.equal "C", unified\at(3).value
+
+		it 'flattens the last tuple', ->
+			tup = Tuple { A, B, (Tuple { A, B }, C) }
+
+			unified = tup\unify!
+			assert.equal "A", unified\at(1).value
+			assert.equal "B", unified\at(2).value
+			assert.equal "A", unified\at(3).value
+			assert.equal "B", unified\at(4).value
+			assert.equal "C", unified.var_arg.value
+
+		it 'rejects conflicting var_arg on last tuple', ->
+			tup = Tuple { A, (Tuple {}, B) }, C
+
+			assert.is_nil tup\unify!
+
+		it 'accepts subset var_arg on last tuple', ->
+			tup = Tuple { A, (Tuple {}, B) }, B + C
+
+			unified = tup\unify!
+			unified_var = unified.var_arg
+			expected_var = B + C
+			assert.equal "A", tup\at(1).value
+			assert.is_true is_equiv expected_var, unified_var
+			

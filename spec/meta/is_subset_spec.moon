@@ -3,13 +3,15 @@ import
 	Type, Tuple, Operation, Literal, GenericOperation, Unknown
 from require 'type-track.meta'
 
-empty = Tuple {}
-unknown_var = Tuple {}, Unknown
 
 describe 'is_subset', ->
+	unit = Tuple {}
+	unknown_var = Tuple {}, Unknown
+
 	A = Literal 'A'
 	B = Literal 'B'
 	C = Literal 'C'
+	D = Literal 'D'
 
 	it 'accepts A <: A | B', ->
 		assert.is_true is_subset A, A + B
@@ -49,14 +51,13 @@ describe 'is_subset', ->
 		assert.is_true is_subset ab_type, x_type
 
 	it 'accepts { call: A -> () } <: { call(T): T -> () }', ->
-		type1 = Operation 'call', A, empty
+		type1 = Operation 'call', A, unit
 		type2 = GenericOperation(
 			'call'
-			(type_params) ->
-				T = type_params\at 1
+			(T) ->
 				return nil if not T
 
-				T, empty
+				T, unit
 
 			(domain) -> domain\at 1
 		)
@@ -64,14 +65,13 @@ describe 'is_subset', ->
 		assert.is_true is_subset type1, type2
 
 	it 'accepts { call(T): () -> T } <: { call: () -> A }', ->
-		type1 = Operation 'call', empty, A
+		type1 = Operation 'call', unit, A
 		type2 = GenericOperation(
 			'call'
-			(type_params) ->
-				T = type_params\at 1
+			(T) ->
 				return nil if not T
 
-				empty, T
+				unit, T
 
 			(domain, range) -> range\at 1
 		)
@@ -82,8 +82,7 @@ describe 'is_subset', ->
 		type1 = Operation 'call', A, A
 		type2 = GenericOperation(
 			'call'
-			(type_params) ->
-				T = type_params\at 1
+			(T) ->
 				return nil if not T
 
 				T, T
@@ -108,26 +107,18 @@ describe 'is_subset', ->
 
 		assert.is_true is_subset type1, type2
 
-	it 'accepts A & B <: (A & B) | (A & C)', ->
-		assert.is_true is_subset A * B, (A * B) + (A * C)
+	it 'accepts A & B <: (A & B) | (A & C)', -> assert.is_true is_subset A * B, (A * B) + (A * C)
+	it 'accepts B | C <: (A | B) | (C | D)', -> assert.is_true is_subset A + B, (A + B) + (C + D)
 
-	it 'rejects A & B <: B & C', ->
-		assert.is_false is_subset A * B, B * C
+	it 'rejects A & B <: B & C', -> assert.is_false is_subset A * B, B * C
+	it 'rejects B & C <: A & B', -> assert.is_false is_subset B * C, A * B
 
-	it 'rejects B & C <: A & B', ->
-		assert.is_false is_subset B * C, A * B
+	it 'accepts anything <: ()', -> assert.is_true is_subset A, Tuple {}
 
-	describe 'when compared up to tuples', ->
-		it 'rejects anything compared to zero elements', ->
-			assert.is_false is_subset Type!, Tuple {}
+	it 'accepts A <: (...A)', -> assert.is_true is_subset A, Tuple {}, A
+	it 'rejects B <: (...B)', -> assert.is_false is_subset B, Tuple {}, A
 
-		it 'accepts the same type compared to zero elements with a var-arg', ->
-			assert.is_true is_subset A, Tuple {}, A
-			assert.is_false is_subset B, Tuple {}, A
+	it 'accepts A <: (A)', -> assert.is_true is_subset A, Tuple { A }
+	it 'rejects B <: (B)', -> assert.is_false is_subset B, Tuple { A }
 
-		it 'accepts the same type compared to one element', ->
-			assert.is_true is_subset A, Tuple { A }
-			assert.is_false is_subset B, Tuple { A }
-
-		it 'rejects anything compared to two elements', ->
-			assert.is_false is_subset Type!, Tuple { Type!, Type! }
+	it 'rejects A <: (A, A)', -> assert.is_false is_subset A, Tuple { A, A }
