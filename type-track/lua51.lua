@@ -1,7 +1,7 @@
 local meta_types = require("type-track.meta")
 local muun = require("type-track.muun")
 
-local Type, Tuple, Operation, Literal, Free, Never, Unknown, GenericOperation =
+local Type, Tuple, Operation, Literal, Free, Never, Unknown, GenericOperation, is_subset =
 	meta_types.Type,
 	meta_types.Tuple,
 	meta_types.Operation,
@@ -9,7 +9,8 @@ local Type, Tuple, Operation, Literal, Free, Never, Unknown, GenericOperation =
 	meta_types.Free,
 	meta_types.Never,
 	meta_types.Unknown,
-	meta_types.GenericOperation
+	meta_types.GenericOperation,
+	meta_types.is_subset
 
 ---@generic F
 ---@param f F
@@ -27,6 +28,20 @@ local function memoize(f)
 	end
 end
 
+---modifies the type so it unifies to itself
+---@param t type-track.Type
+---@return type-track.Type t
+local function axiom(t)
+	if t.__class == Free then
+		---@cast t type-track.Free
+		t.unified = t.value
+		t.value.unified = t.value
+	else
+		t.unified = t
+	end
+	return t
+end
+
 local T = Tuple
 
 local unit = T({})
@@ -36,6 +51,8 @@ local _string = Free()
 local stringlib = Free()
 local _false = Free()
 
+local falsy = Operation("truthy", Never, _false)
+
 ---@param value string
 ---@return type-track.Literal
 local function string_of(value)
@@ -43,9 +60,9 @@ local function string_of(value)
 end
 string_of = memoize(string_of)
 
-local _nil = Operation("type", Never, string_of("nil"))
-	* Operation("truthy", Never, _false)
+local _nil = Literal(nil, Operation("type", Never, string_of("nil")) * falsy)
 
+local boolean = Operation("type", Never, string_of("boolean"))
 local thread = Operation("type", Never, string_of("thread"))
 local userdata = Operation("type", Never, string_of("userdata"))
 
@@ -57,10 +74,8 @@ local unknown_var = T({}, Unknown)
 local function_type = Operation("type", Never, string_of("function"))
 local _function = function_type * Operation("call", unknown_var, unknown_var)
 
-local boolean = Operation("type", Never, string_of("boolean"))
-
 local _true = Literal(true, boolean)
-_false.value = Literal(false, boolean * Operation("truthy", Never, _false))
+_false.value = Literal(false, boolean * falsy)
 
 _string.value = Operation("type", Never, string_of("string"))
 	* concat_call
@@ -91,8 +106,7 @@ end
 ---@param infer_fn type-track.GenericOperation.infer_fn
 ---@return type-track.Type func
 local function gen_func(derive_fn, infer_fn)
-	return Operation("type", Never, string_of("function"))
-		* GenericOperation("call", derive_fn, infer_fn)
+	return function_type * GenericOperation("call", derive_fn, infer_fn)
 end
 
 local num2_to_num = func(T({ number, number }), number)
@@ -100,6 +114,15 @@ local num2_to_num = func(T({ number, number }), number)
 local num_or_nil = _nil + number
 local num_var = T({}, number)
 local string_or_num_var = T({}, string_or_num)
+
+---@param k type-track.Type
+---@param v type-track.Type
+---@return type-track.Type
+local function map_of(k, v)
+	return Operation("type", Never, string_of("table"))
+		* Operation("index", k, v)
+		* Operation("newindex", T({ k, v }), Never)
+end
 
 ---@param t type-track.Type
 ---@return type-track.Type
@@ -357,13 +380,10 @@ local hook_event = string_of("call")
 	+ string_of("count")
 
 local debug_hook = func(T({ hook_event, number }), unit)
-local hook_mask = string_of("c")
-	+ string_of("r")
-	+ string_of("l")
-	+ string_of("")
 
 local thread_or_nil = thread + _nil
 local func_or_num = _function + number
+local table_or_nil = _table + _nil
 
 local debug_info = lib({
 	currentline = number,
@@ -383,7 +403,7 @@ local debug_info = lib({
 local debuglib = lib({
 	debug = func(unit, unit),
 	getfenv = func(_function, _table),
-	gethook = func(thread_or_nil, _nil + T({ debug_hook, hook_mask, number })),
+	gethook = func(thread_or_nil, _nil + T({ debug_hook, _string, number })),
 	getinfo = func(T({ thread, func_or_num, _string }), _table)
 		* func(T({ func_or_num, _string }, _table))
 		* func(T({ thread, func_or_num }), debug_info)
@@ -395,7 +415,7 @@ local debuglib = lib({
 	getmetatable = func(Unknown, _table + _nil),
 	getregistry = func(unit, _table),
 	getupvalue = func(T({ _function, number }), T({ _string, Unknown }) + unit),
-	setfenv = gen_func(function(tup) -- result_of
+	setfenv = gen_func(function(tup) -- derive_fn
 		local A = tup:at(1)
 		local R = tup:at(2)
 		if not A or not R then
@@ -403,14 +423,14 @@ local debuglib = lib({
 		end
 
 		local func_arg = func(A, R)
-		return func(T({ func_arg, _table }), func_arg)
-	end, function(params) -- params_of
-		local func_arg = params:at(1)
-		local table_arg = params:at(2)
+		return T({ func_arg, _table }), func_arg
+	end, function(domain) -- infer_fn
+		local func_arg = domain:at(1)
+		local table_arg = domain:at(2)
 		if
 			not func_arg
 			or not table_arg
-			or func_arg:eval("type", Never) ~= string_of("function")
+			or not is_subset(func_arg, function_type)
 		then
 			return nil
 		end
@@ -425,11 +445,50 @@ local debuglib = lib({
 
 		return nil
 	end),
+	sethook = func(T({ thread_or_nil, debug_hook, _string, num_or_nil }), unit)
+		* func(T({ thread_or_nil, _nil, string_or_nil, num_or_nil }), unit)
+		* func(T({ debug_hook, _string, num_or_nil }), unit)
+		* func(T({ _nil, string_or_nil, num_or_nil }), unit),
+	setlocal = func(T({ thread, number, number, Unknown }), string_or_nil)
+		* func(T({ number, number, Unknown }), string_or_nil),
+	setmetatable = func(T({ Unknown, table_or_nil }), unit),
+
+	setupvalue = func(T({ _function, number, Unknown }), string_or_nil),
+
+	traceback = func(T({ thread, string_or_nil, num_or_nil }), _string)
+		* func(T({ string_or_nil, num_or_nil }), _string),
 })
 
--- packagelib
--- module()
--- require()
+local packagelib = lib({
+	cpath = _string,
+	path = _string,
+	loaded = map_of(_string, Unknown),
+	loaders = array_of(func(_string, func(_string, Unknown) + _string + _nil)),
+	loadlib = func(T({ _string, _string }), _function),
+	preload = map_of(_string, func(_string, Unknown) + _nil),
+
+	seeall = func(_table, unit),
+})
+
+local _module = func(T({ _string }, func(_table, unit)), unit)
+local _require = func(_string, Unknown)
+
+local _assert = gen_func(function(tup)
+	local T = tup:at(1)
+	local As = tup:at(2)
+	if not T then
+		return nil
+	end
+end, function(params, returns)
+	local T = params:at(1)
+	if params.__class == Tuple then
+		---@cast params type-track.Tuple
+		local As = {}
+		for i = 2, #params.types do
+			table.insert(As, params.types[i])
+		end
+	end
+end)
 
 -- globals:
 -- assert()
@@ -460,7 +519,8 @@ local debuglib = lib({
 -- _VERSION
 -- xpcall()
 
-return {
+local lua51 = {
+	-- base types
 	["nil"] = _nil,
 	boolean = boolean,
 	number = number,
@@ -470,6 +530,7 @@ return {
 	thread = thread,
 	userdata = userdata,
 
+	-- standard libraries
 	coroutinelib = coroutinelib,
 	stringlib = stringlib,
 	tablelib = tablelib,
@@ -477,4 +538,15 @@ return {
 	iolib = iolib,
 	oslib = oslib,
 	debuglib = debuglib,
+	packagelib = packagelib,
+
+	-- standard globals that aren't libraries
+	module = _module,
+	require = _require,
 }
+
+for k, t in pairs(lua51) do
+	lua51[k] = axiom(t)
+end
+
+return lua51
