@@ -1,4 +1,6 @@
 {
 	"stylua.targetReleaseVersion": "latest",
-	"editor.formatOnSave": true
+	"editor.formatOnSave": true,
+	"editor.insertSpaces": false,
+	"editor.tabSize": 2
 }

@@ -55,10 +55,10 @@ local Never
 ---@alias type-track.GenericOperation.derive_fn fun(type_params: type-track.Type): (domain: type-track.Type?, range: type-track.Type?)
 ---@alias type-track.GenericOperation.infer_fn fun(domain: type-track.Type, range: type-track.Type?): (type_params: type-track.Type?)
 
----an operator that captures its types on usage
+---an operation that captures its types on usage
 ---
 ---```lua
----a: <T>(T) -> T -- a generic call operator
+---a: <T>(T) -> T -- a generic call operation
 ---b: (string) -> string
 ---
 ----- valid
@@ -73,7 +73,7 @@ local Never
 ---- `derive_fn` takes its type parameters and returns its domain and
 ---  range.
 ---
----- `infer_fn` takes the domain and possible range from its usage and
+---- `infer_fn` takes the domain and optional range from its usage and
 ---  returns the type parameters it inferred.
 ---
 ---Example:
@@ -582,8 +582,8 @@ do -- Operation
 	---@return boolean
 	function Operation.is_subset(subset, superset)
 		return subset.op == superset.op
-				and is_subset(superset.domain, subset.domain)
-				and is_subset(subset.range, superset.range)
+			and is_subset(superset.domain, subset.domain)
+			and is_subset(subset.range, superset.range)
 	end
 
 	---@param op string
@@ -1252,7 +1252,7 @@ do -- Literal
 	---@return boolean
 	function Literal.is_subset(subset, superset)
 		return subset.value == superset.value
-				and is_subset(subset.ops, superset.ops)
+			and is_subset(subset.ops, superset.ops)
 	end
 
 	---@param op string
@@ -1308,6 +1308,80 @@ do -- Free
 		end
 
 		return result
+	end
+
+	---@type fun(elem: type-track.Type, free: type-track.Free, value: type-track.Type): type-track.Type
+	local redefine
+
+	---@type { [any]: fun(elem: type-track.Type, free: type-track.Free, value: type-track.Type): type-track.Type }
+	local redefine_class_handlers = {
+		---@param elem type-track.Free
+		[Free] = function(elem, free, value)
+			return redefine(
+				assert(elem.value, "attempt to use an empty Free type"),
+				free,
+				value
+			)
+		end,
+		---@param elem type-track.Operation
+		[Operation] = function(elem, free, value)
+			return Operation(
+				elem.op,
+				redefine(elem.domain, free, value),
+				redefine(elem.range, free, value)
+			)
+		end,
+		---@param elem type-track.Tuple
+		[Tuple] = function(elem, free, value)
+			local new_types = {}
+			for i, t in ipairs(elem.types) do
+				new_types[i] = redefine(t, free, value)
+			end
+			local new_var_arg = elem.var_arg and redefine(elem.var_arg, free, value)
+			return Tuple(new_types, new_var_arg)
+		end,
+		---@param elem type-track.Union
+		[Union] = function(elem, free, value)
+			local new_types = {}
+			for i, t in ipairs(elem.types) do
+				new_types[i] = redefine(t, free, value)
+			end
+			return Union(new_types)
+		end,
+		---@param elem type-track.Intersection
+		[Intersection] = function(elem, free, value)
+			local new_types = {}
+			for i, t in ipairs(elem.types) do
+				new_types[i] = redefine(t, free, value)
+			end
+			return Intersection(new_types)
+		end,
+		---@param elem type-track.Literal
+		[Literal] = function(elem, free, value)
+			return Literal(elem.value, redefine(elem.ops, free, value))
+		end,
+	}
+
+	---@param elem type-track.Type
+	---@param free type-track.Free
+	---@param value type-track.Type
+	---@return type-track.Type
+	function redefine(elem, free, value)
+		if elem == free then
+			return value
+		elseif elem == Unknown or elem == Never then
+			return elem
+		else
+			local handler = assert(
+				redefine_class_handlers[elem.__class],
+				"unhandled type in redefine"
+			)
+			return handler(elem, free, value)
+		end
+	end
+
+	function FreeInst:define(value)
+		return redefine(value, self, value)
 	end
 
 	---@return type-track.Type? range
@@ -1450,8 +1524,8 @@ do -- GenericOperation
 		end
 
 		return subset.op == superset.op
-				and is_subset(subset_domain, superset_domain)
-				and is_subset(superset_range, subset_range)
+			and is_subset(subset_domain, superset_domain)
+			and is_subset(superset_range, subset_range)
 	end
 
 	---@param op string

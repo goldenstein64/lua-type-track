@@ -1,2 +1,7 @@
+"$schema" = "./stylua-schema.json"
+
 column_width = 80
+line_endings = "Unix"
 indent_width = 2
+indent_type = "Tabs"
+call_parentheses = "None"
