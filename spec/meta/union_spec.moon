@@ -1,6 +1,7 @@
 import
 	is_subset
 	Literal, Union, Type, Unknown, Free, Operation
+	Intersection
 from require 'type-track.meta'
 
 describe 'Union', ->
@@ -61,3 +62,53 @@ describe 'Union', ->
 			unified_union = union\normalize!
 
 			assert.is_nil unified_union
+
+	describe 'get_domain', ->
+		it 'returns nil for wrong op', ->
+			union = Union {
+				Operation 'call', A, B
+				Operation 'call', B, C
+			}
+
+			assert.is_nil union\get_domain 'index'
+
+		it 'returns an intersection of types', ->
+			union = Union {
+				Operation 'call', A, B
+				Operation 'call', B, C
+			}
+
+			result = union\get_domain 'call'
+			target = Intersection { A, B }
+
+			assert.is_true is_subset result, target
+			assert.is_true is_subset target, result
+
+	describe 'eval', ->
+		it 'returns nil for wrong op', ->
+			union = Union {
+				Operation 'call', A, B
+				Operation 'call', B, C
+			}
+
+			assert.is_nil union\eval 'index', A
+
+		it 'returns nil for wrong param', ->
+			union = Union {
+				Operation 'call', A, B
+				Operation 'call', B, C
+			}
+
+			assert.is_nil union\eval 'call', C
+
+		it 'returns a union of types', ->
+			union = Union {
+				Operation 'call', A, B
+				Operation 'call', A, C
+			}
+
+			result = union\eval 'call', A
+			target = Union { B, C }
+
+			assert.is_true is_subset result, target
+			assert.is_true is_subset target, result

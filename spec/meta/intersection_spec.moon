@@ -123,6 +123,14 @@ describe 'Intersection', ->
 			}
 
 			assert.is_nil inter\eval 'index', Never
+
+		it 'returns nil for wrong domain', ->
+			inter = Intersection {
+				Operation 'call', A, B
+				Operation 'call', B, C
+			}
+
+			assert.is_nil inter\eval 'call', C
 		
 		it 'returns an intersection of compatible types', ->
 			inter = Intersection {
