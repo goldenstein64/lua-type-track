@@ -23,22 +23,22 @@ describe 'Intersection', ->
 
 		assert.is_true inter\is_instance Type
 
-	describe 'unify', ->
+	describe 'normalize', ->
 		it 'works with Never', ->
 			inter = Intersection { Never, A }
 
-			assert.equal Never, inter\unify!
+			assert.equal Never, inter\normalize!
 
 		it 'simplifies nested intersections', ->
 			inter = Intersection { A, Intersection { B, C } }
-			unified = inter\unify!
+			unified = inter\normalize!
 			for t in *unified.types
 				assert.is_false t\is_instance Intersection
 
 		it 'simplifies nested intersections with duplicates', ->
 			inter = Intersection { A, Intersection { A, B } }
 
-			unified = inter\unify!
+			unified = inter\normalize!
 
 			assert.equal 2, #unified.types
 			{ elem1, elem2 } = unified.types
@@ -56,9 +56,9 @@ describe 'Intersection', ->
 			assert.is_true is_subset op1, op2
 
 			inter = Intersection { op1, op2 }
-			unified = inter\unify!
+			unified = inter\normalize!
 
-			-- unifying should return the subset, i.e. op1
+			-- normalizeing should return the subset, i.e. op1
 			assert.is_true is_subset op1, unified
 			assert.is_true is_subset unified, op1
 
@@ -70,7 +70,7 @@ describe 'Intersection', ->
 
 			expected = op
 
-			unified = inter\unify!
+			unified = inter\normalize!
 			assert.not_nil unified
 			assert.is_true is_subset unified, expected
 			assert.is_true is_subset expected, unified
@@ -90,5 +90,5 @@ describe 'Intersection', ->
 				concat_call
 			}
 
-			assert.is_nil concat_call\unify!
-			assert.is_nil _string\unify!
+			assert.is_nil concat_call\normalize!
+			assert.is_nil _string\normalize!

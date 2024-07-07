@@ -100,16 +100,16 @@ describe 'Tuple', ->
 			assert.equal B, tup\at 2
 			assert.equal nil, tup\at 3
 
-	describe 'unify', ->
+	describe 'normalize', ->
 		it 'returns itself when empty', ->
 			tup = Tuple {}
 
-			assert.equal tup, tup\unify!
+			assert.equal tup, tup\normalize!
 
 		it 'truncates middle tuples', ->
 			tup = Tuple { A, (Tuple { A, B }), C }
 
-			unified = tup\unify!
+			unified = tup\normalize!
 			assert.equal "A", unified\at(1).value
 			assert.equal "A", unified\at(2).value
 			assert.equal "C", unified\at(3).value
@@ -117,7 +117,7 @@ describe 'Tuple', ->
 		it 'flattens the last tuple', ->
 			tup = Tuple { A, B, (Tuple { A, B }, C) }
 
-			unified = tup\unify!
+			unified = tup\normalize!
 			assert.equal "A", unified\at(1).value
 			assert.equal "B", unified\at(2).value
 			assert.equal "A", unified\at(3).value
@@ -127,12 +127,12 @@ describe 'Tuple', ->
 		it 'rejects conflicting var_arg on last tuple', ->
 			tup = Tuple { A, (Tuple {}, B) }, C
 
-			assert.is_nil tup\unify!
+			assert.is_nil tup\normalize!
 
 		it 'accepts subset var_arg on last tuple', ->
 			tup = Tuple { A, (Tuple {}, B) }, B + C
 
-			unified = tup\unify!
+			unified = tup\normalize!
 			unified_var = unified.var_arg
 			expected_var = B + C
 			assert.equal "A", tup\at(1).value

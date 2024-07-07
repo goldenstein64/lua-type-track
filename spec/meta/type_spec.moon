@@ -50,12 +50,12 @@ describe 'type', ->
 			assert.is_nil type3\at 3
 			assert.is_nil type3\at 4
 
-	describe 'default unify', ->
+	describe 'default normalize', ->
 		it 'returns itself', ->
 			type1 = Type!
-			assert.equal type1, type1\unify!
+			assert.equal type1, type1\normalize!
 
 		it 'returns nil if already visited', ->
 			type2 = Type!
 			visited = { [type2]: true }
-			assert.is_nil type2\unify visited
+			assert.is_nil type2\normalize visited

@@ -13,15 +13,15 @@ describe 'Union', ->
 
 		assert.is_true union\is_instance Type
 
-	describe 'unify', ->
+	describe 'normalize', ->
 		it 'works with Unknown', ->
 			union = Union { A, Unknown }
 
-			assert.equal Unknown, union\unify!
+			assert.equal Unknown, union\normalize!
 
 		it 'simplifies nested unions', ->
 			union = Union { A, Union { B, C } }
-			unified = union\unify!
+			unified = union\normalize!
 
 			for t in *unified.types
 				assert.is_false t\is_instance Union
@@ -29,7 +29,7 @@ describe 'Union', ->
 		it 'simplifies nested unions with duplicates', ->
 			union = Union { A, Union { A, B } }
 
-			unified = union\unify!
+			unified = union\normalize!
 
 			assert.equal 2, #unified.types
 			{ elem1, elem2 } = unified.types
@@ -46,7 +46,7 @@ describe 'Union', ->
 			union.value = Union { op, op, union }
 
 			expected = op
-			unified = union\unify!
+			unified = union\normalize!
 			assert.not_nil unified
 			assert.is_true is_subset expected, unified
 			assert.is_true is_subset unified, expected
@@ -58,6 +58,6 @@ describe 'Union', ->
 			op.value = Operation "some", A, union
 			union.value = Union { op, B }
 
-			unified_union = union\unify!
+			unified_union = union\normalize!
 
 			assert.is_nil unified_union

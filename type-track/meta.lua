@@ -138,7 +138,7 @@ local function is_subset(subset, superset)
 	end
 
 	do
-		local unified = subset:unify()
+		local unified = subset:normalize()
 		if not unified then
 			return false
 		end
@@ -149,7 +149,7 @@ local function is_subset(subset, superset)
 	end
 
 	do
-		local unified = superset:unify()
+		local unified = superset:normalize()
 		if not unified then
 			return false
 		end
@@ -408,10 +408,10 @@ do -- Type
 	---- Otherwise, it returns `nil`. Typically, this means the type is invalid.
 	---
 	---Note: If you plan to change the behavior of this method, override
-	---`Type:_unify()`.
+	---`Type:_normalize()`.
 	---@param visited? { [type-track.Type]: true? }
 	---@return type-track.Type?
-	function TypeInst:unify(visited)
+	function TypeInst:normalize(visited)
 		if self.unified then
 			return self.unified
 		end
@@ -424,7 +424,7 @@ do -- Type
 
 		visited[self] = true
 
-		local result = self:_unify(visited)
+		local result = self:_normalize(visited)
 		if not result then
 			return nil
 		end
@@ -436,7 +436,7 @@ do -- Type
 	end
 
 	---defines the algorithm for converting a type into its simplest form. This
-	---is a protected method that implements `Type:unify()`. It must always
+	---is a protected method that implements `Type:normalize()`. It must always
 	---return either a `Type` or `nil`.
 	---
 	---- If the type is already in its simplest form, it can return itself, but
@@ -444,12 +444,12 @@ do -- Type
 	---- If unification succeeds, it returns a new `Type`.
 	---- Otherwise, it returns `nil`.
 	---
-	---The public method makes sure to call `_unify` only when the type hasn't
+	---The public method makes sure to call `_normalize` only when the type hasn't
 	---been unified before and the type wasn't already visited during a parent
 	---unification.
 	---@param visited { [type-track.Type]: true? }
 	---@return type-track.Type? unified
-	function TypeInst:_unify(visited)
+	function TypeInst:_normalize(visited)
 		return self
 	end
 
@@ -590,6 +590,7 @@ do -- Operation
 	---@param domain type-track.Type
 	---@return type-track.Type? range
 	function OperationInst:eval(op, domain)
+		assert(op ~= nil, "op cannot be nil")
 		if op ~= self.op then
 			return nil
 		end
@@ -613,13 +614,13 @@ do -- Operation
 
 	---@param visited { [type-track.Type]: true? }
 	---@return type-track.Type?
-	function OperationInst:_unify(visited)
-		local domain = self.domain:unify(visited)
+	function OperationInst:_normalize(visited)
+		local domain = self.domain:normalize(visited)
 		if not domain then
 			return nil
 		end
 
-		local range = self.range:unify(visited)
+		local range = self.range:normalize(visited)
 		if not range then
 			return nil
 		end
@@ -748,7 +749,7 @@ do -- Tuple
 
 	---@param visited { [type-track.Type]: true? }
 	---@return type-track.Type?
-	function TupleInst:_unify(visited)
+	function TupleInst:_normalize(visited)
 		local has_args = #self.types > 0
 		local self_var_arg = self.var_arg
 		-- 0 values is NOT the same as Never
@@ -762,7 +763,7 @@ do -- Tuple
 		if has_args then
 			for i = 1, #self.types - 1 do
 				local elem = self.types[i]
-				local unified = elem:unify(visited)
+				local unified = elem:normalize(visited)
 				if not unified then
 					return nil
 				end
@@ -771,7 +772,7 @@ do -- Tuple
 			end
 
 			local last_elem = self.types[#self.types]
-			local last_unified = last_elem:unify(visited)
+			local last_unified = last_elem:normalize(visited)
 			if not last_unified then
 				return nil
 			end
@@ -796,7 +797,7 @@ do -- Tuple
 		end
 
 		if self_var_arg then
-			unified_var_arg = self_var_arg:unify(visited)
+			unified_var_arg = self_var_arg:normalize(visited)
 			if not unified_var_arg then
 				return nil
 			end
@@ -938,7 +939,7 @@ do -- Union
 				-- A | A = A, so we can skip itself
 				goto continue
 			end
-			local unified = elem:unify(visited)
+			local unified = elem:normalize(visited)
 			if not unified then
 				return nil
 			elseif unified == Unknown then
@@ -960,13 +961,13 @@ do -- Union
 
 	---@param visited { [type-track.Type]: true? }
 	---@return type-track.Type?
-	function UnionInst:_unify(visited)
+	function UnionInst:_normalize(visited)
 		local flattened = flatten_union(self, self.types, visited)
 		if not flattened then
 			return nil
 		end
 
-		assert(#flattened > 0, "no types to unify?")
+		assert(#flattened > 0, "no types to normalize?")
 		if #flattened == 1 then
 			return flattened[1]
 		else
@@ -1138,7 +1139,7 @@ do -- Intersection
 				goto continue
 			end
 
-			local unified = elem:unify(visited)
+			local unified = elem:normalize(visited)
 			if not unified then
 				return nil
 			elseif unified == Never then
@@ -1147,7 +1148,7 @@ do -- Intersection
 				---@cast unified type-track.Intersection
 				for _, sub_elem in ipairs(unified.types) do
 					-- `sub_elem` is already unified here, because that's what
-					-- `Intersection:unify()` does
+					-- `Intersection:normalize()` does
 					intersection_insert(result, sub_elem)
 				end
 			else
@@ -1199,17 +1200,17 @@ do -- Intersection
 			table.insert(result, Intersection(permutation))
 		end
 
-		return Union(result):unify(visited)
+		return Union(result):normalize(visited)
 	end
 
 	---@param visited { [type-track.Type]: true? }
 	---@return type-track.Type?
-	function IntersectionInst:_unify(visited)
+	function IntersectionInst:_normalize(visited)
 		local flattened = flatten_intersection(self, self.types, visited)
 		if not flattened then
 			return nil
 		end
-		assert(#flattened > 0, "no types to unify?")
+		assert(#flattened > 0, "no types to normalize?")
 		if #flattened == 1 then
 			return flattened[1]
 		end
@@ -1270,8 +1271,8 @@ do -- Literal
 
 	---@param visited? { [type-track.Type]: true? }
 	---@return type-track.Type?
-	function LiteralInst:_unify(visited)
-		local unified_ops = self.ops:unify(visited)
+	function LiteralInst:_normalize(visited)
+		local unified_ops = self.ops:normalize(visited)
 		if not unified_ops then
 			return nil
 		end
@@ -1400,12 +1401,12 @@ do -- Free
 	end
 
 	---@return type-track.Type?
-	function FreeInst:unify(...)
+	function FreeInst:normalize(...)
 		if self.unified then
 			return self.unified
 		end
 
-		return self:unwrap():unify(...)
+		return self:unwrap():normalize(...)
 	end
 
 	---@return string
