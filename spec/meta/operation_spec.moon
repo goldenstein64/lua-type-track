@@ -64,25 +64,30 @@ describe 'Operation', ->
 			assert.is_false Operation.is_subset func32, func23
 
 	describe 'get_domain', ->
-		it 'gives nil for the wrong op', ->
+		it 'returns nil for the wrong op', ->
 			func = Operation 'call', Never, ABC
 
 			assert.is_nil func\get_domain 'index'
 
+		it 'returns a domain type when given a compatible op', ->
+			func = Operation 'call', AB, ABC
+
+			assert.equal AB, func\get_domain 'call'
+
 	describe 'eval', ->
 
-		it 'gives nil for the wrong op', ->
+		it 'returns nil for the wrong op', ->
 			func = Operation 'call', Never, ABC
 
 			assert.is_nil func\eval 'index'
 
-		it 'gives a return type when given a compatible domain type', ->
+		it 'returns a type when given a compatible domain type', ->
 			func = Operation 'call', AB, ABC
 
 			assert.equal ABC, func\eval 'call', AB
 			assert.equal ABC, func\eval 'call', ABC
 
-		it 'gives nil when given an incompatible domain type', ->
+		it 'returns nil when given an incompatible domain type', ->
 			func = Operation 'call', AB, ABC
 
 			assert.is_nil func\eval 'call', Unknown

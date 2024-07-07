@@ -1,6 +1,7 @@
 import
 	is_subset
 	Type, Tuple, Literal, Intersection, Never, Operation, Free
+	Union
 from require 'type-track.meta'
 
 memoize = (f) ->
@@ -92,3 +93,44 @@ describe 'Intersection', ->
 
 			assert.is_nil concat_call\normalize!
 			assert.is_nil _string\normalize!
+
+	describe 'get_domain', ->
+		it 'returns nil for a wrong op', ->
+			inter = Intersection {
+				Operation 'call', A, B
+				Operation 'call', B, C
+			}
+
+			assert.is_nil inter\get_domain 'index'
+
+		it 'returns a union of compatible types', ->
+			inter = Intersection {
+				Operation 'call', A, B
+				Operation 'call', B, C
+			}
+
+			domain = inter\get_domain 'call'
+			target = Union { A, B }
+
+			assert.is_true is_subset domain, target
+			assert.is_true is_subset target, domain
+
+	describe 'eval', ->
+		it 'returns nil for a wrong op', ->
+			inter = Intersection {
+				Operation 'call', A, B
+				Operation 'call', B, C
+			}
+
+			assert.is_nil inter\eval 'index', Never
+		
+		it 'returns an intersection of compatible types', ->
+			inter = Intersection {
+				Operation 'call', A, B
+				Operation 'call', A, C
+			}
+			range = inter\eval 'call', A
+			target = Intersection { B, C }
+
+			assert.is_true is_subset range, target
+			assert.is_true is_subset target, range
