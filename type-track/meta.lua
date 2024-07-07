@@ -939,6 +939,7 @@ do -- Union
 				-- A | A = A, so we can skip itself
 				goto continue
 			end
+
 			local unified = elem:normalize(visited)
 			if not unified then
 				return nil
