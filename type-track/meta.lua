@@ -960,6 +960,36 @@ do -- Union
 		return result
 	end
 
+	---refines this type to all the elements that are a subtype of `constraint`
+	---
+	---```lua
+	---local fooBar: { type: "foo", foo: "value" } | { type: "bar", bar: "value" }
+	---
+	---if fooBar.type == "foo" then
+	---  -- fooBar undergoes fooBar:refine(
+	---  --   Operation("index", Literal("type"), Literal("foo"))
+	---  -- )
+	---end
+	---```
+	---@param constraint type-track.Type
+	---@return type-track.Type
+	function UnionInst:refine(constraint)
+		local result = {}
+		for _, elem in ipairs(self.types) do
+			if is_subset(elem, constraint) then
+				table.insert(result, elem)
+			end
+		end
+
+		if #result == 0 then
+			return Never
+		elseif #result == 1 then
+			return result[1]
+		else
+			return Union(result)
+		end
+	end
+
 	---@param visited { [type-track.Type]: true? }
 	---@return type-track.Type?
 	function UnionInst:_normalize(visited)

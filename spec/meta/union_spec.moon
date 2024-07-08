@@ -112,3 +112,27 @@ describe 'Union', ->
 
 			assert.is_true is_subset result, target
 			assert.is_true is_subset target, result
+
+	describe 'refine', ->
+		it 'works', ->
+			valueLit = Literal 'value'
+			fooLit = Literal 'foo'
+			barLit = Literal 'bar'
+			typeLit = Literal 'type'
+
+			fooType = Intersection({
+				Operation 'index', typeLit, fooLit
+				Operation 'index', fooLit, valueLit
+			})\normalize!
+			barType = Intersection({
+				Operation 'index', typeLit, barLit
+				Operation 'index', barLit, valueLit
+			})\normalize!
+			union = Union({ fooType, barType })\normalize!
+
+			constraint = Operation 'index', typeLit, fooLit
+
+			refined = union\refine constraint
+
+			assert.is_true is_subset fooType, refined
+			assert.is_true is_subset refined, fooType
