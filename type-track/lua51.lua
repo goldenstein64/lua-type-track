@@ -473,21 +473,12 @@ local packagelib = lib({
 local _module = func(T({ _string }, func(_table, unit)), unit)
 local _require = func(_string, Unknown)
 
+-- users will have to implement type refinements themselves
+-- <As...>(As...) -> (As...)
 local _assert = gen_func(function(tup)
-	local T = tup:at(1)
-	local As = tup:at(2)
-	if not T then
-		return nil
-	end
+	return tup, tup
 end, function(params, returns)
-	local T = params:at(1)
-	if params.__class == Tuple then
-		---@cast params type-track.Tuple
-		local As = {}
-		for i = 2, #params.types do
-			table.insert(As, params.types[i])
-		end
-	end
+	return (params * returns):normalize()
 end)
 
 -- globals:
@@ -543,6 +534,7 @@ local lua51 = {
 	-- standard globals that aren't libraries
 	module = _module,
 	require = _require,
+	assert = _assert,
 }
 
 for k, t in pairs(lua51) do
