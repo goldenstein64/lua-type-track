@@ -122,3 +122,10 @@ describe 'is_subset', ->
 	it 'rejects B <: (B)', -> assert.is_false is_subset B, Tuple { A }
 
 	it 'rejects A <: (A, A)', -> assert.is_false is_subset A, Tuple { A, A }
+
+	it 'accepts ({ X: A -> B } | { X: C -> D }) == ({ X: (A & C) -> (B | D) })', ->
+		type1 = (Operation 'X', A, B) + (Operation 'X', C, D)
+		type2 = Operation 'X', (A * C), (B + D)
+
+		assert.is_true (is_subset type1, type2), 'type1 </: type2'
+		assert.is_true (is_subset type2, type1), 'type2 </: type1'

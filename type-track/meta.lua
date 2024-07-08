@@ -219,7 +219,22 @@ local function is_subset(subset, superset)
 	elseif super_cls == Union then
 		---@cast superset type-track.Union
 		---@cast subset type-track.Type
-		return is_subset_of_any(subset, superset.types)
+		if sub_cls == Operation then
+			---@cast subset type-track.Operation
+			local superset_domain = superset:get_domain(subset.op)
+			if not superset_domain then
+				return false
+			end
+			local superset_range = superset:eval(subset.op, superset_domain)
+			if not superset_range then
+				return false
+			end
+
+			-- handles (A & C) -> (B | D) <: (A -> B) | (C -> D)
+			return is_subset(superset_domain, subset.domain)
+				and is_subset(subset.range, superset_range)
+		else
+			return is_subset_of_any(subset, superset.types)
 	elseif super_cls == Intersection then
 		---@cast superset type-track.Intersection
 		---@cast subset type-track.Type
