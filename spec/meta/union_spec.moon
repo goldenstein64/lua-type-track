@@ -123,12 +123,12 @@ describe 'Union', ->
 			fooType = Intersection({
 				Operation 'index', typeLit, fooLit
 				Operation 'index', fooLit, valueLit
-			})\normalize!
+			})
 			barType = Intersection({
 				Operation 'index', typeLit, barLit
 				Operation 'index', barLit, valueLit
-			})\normalize!
-			union = Union({ fooType, barType })\normalize!
+			})
+			union = Union({ fooType, barType })
 
 			constraint = Operation 'index', typeLit, fooLit
 
