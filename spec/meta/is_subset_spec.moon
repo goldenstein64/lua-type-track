@@ -127,10 +127,10 @@ describe 'is_subset', ->
 
 	it 'accepts ({ X: A -> B } | { X: C -> D }) == ({ X: (A & C) -> (B | D) })', ->
 		type1 = (Operation 'X', A, B) + (Operation 'X', C, D)
-		type2 = Operation 'X', (A * C), (B + D)
+		type2 = Operation 'X', A * C, B + D
 
-		assert.is_true (is_subset type1, type2), 'type1 </: type2'
-		assert.is_true (is_subset type2, type1), 'type2 </: type1'
+		assert.is_true is_subset type1, type2
+		assert.is_true is_subset type2, type1
 
 	it 'rejects map_of(A, C) <: map_of(A, BC) and map_of(A, BC) <: map(A, C) given BC <: C', ->
 		map_of = (K, V) ->
