@@ -340,7 +340,7 @@ end
 do -- Type
 	---@class type-track.Type : Inheritable
 	---@field normalized type-track.Type?
-	---@field repr_name string?
+	---@field debug_name string?
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator add(type-track.Type): type-track.Union
 	local TypeInst = muun("Type", Inheritable)
@@ -525,10 +525,14 @@ do -- Type
 
 	---@param visited { [type-track.Type]: number?, n: number }
 	---@return string
-	function TypeInst:sub_repr(visited)
+	function TypeInst:debug_substring(visited)
 		if self.__class == Free then
 			---@cast self type-track.Free
 			self = self:unwrap()
+		end
+
+		if self.debug_name then
+			return self.debug_name
 		end
 
 		local visit_id = visited[self]
@@ -538,17 +542,13 @@ do -- Type
 			visited.n = visited.n + 1
 			visit_id = visited.n
 			visited[self] = visit_id
-			return string.format(
-				"<%d>%s",
-				visit_id,
-				self.repr_name or self:repr(visited)
-			)
+			return string.format("<%d>%s", visit_id, self:debug_string(visited))
 		end
 	end
 
 	---@param visited { [type-track.Type]: number?, n: number }
 	---@return string
-	function TypeInst:repr(visited)
+	function TypeInst:debug_string(visited)
 		error("not implemented")
 	end
 
@@ -556,7 +556,7 @@ do -- Type
 	---the same string as another type, they are the same type.
 	---@return string
 	function TypeInst:__tostring()
-		return self.repr_name or self:sub_repr({ n = 0 })
+		return self.debug_name or self:debug_substring({ n = 0 })
 	end
 
 	function Type:__inherited(cls)
@@ -646,12 +646,12 @@ do -- Operation
 
 	---@param visited { [type-track.Type]: number?, n: number }
 	---@return string
-	function OperationInst:repr(visited)
+	function OperationInst:debug_string(visited)
 		return string.format(
 			"{ %s: %s -> %s }",
 			self.op,
-			self.domain:sub_repr(visited),
-			self.range:sub_repr(visited)
+			self.domain:debug_substring(visited),
+			self.range:debug_substring(visited)
 		)
 	end
 end
@@ -829,14 +829,17 @@ do -- Tuple
 
 	---@param visited { [type-track.Type]: number?, n: number }
 	---@return string
-	function TupleInst:repr(visited)
+	function TupleInst:debug_string(visited)
 		local strings = {} ---@type string[]
 		for _, t in ipairs(self.types) do
-			table.insert(strings, t:sub_repr(visited))
+			table.insert(strings, t:debug_substring(visited))
 		end
 
 		if self.var_arg then
-			table.insert(strings, VAR_STR:format(self.var_arg:sub_repr(visited)))
+			table.insert(
+				strings,
+				VAR_STR:format(self.var_arg:debug_substring(visited))
+			)
 		end
 
 		return string.format("(%s)", table.concat(strings, ", "))
@@ -1051,10 +1054,10 @@ do -- Union
 
 	---@param visited { [type-track.Type]: number?, n: number }
 	---@return string
-	function UnionInst:repr(visited)
+	function UnionInst:debug_string(visited)
 		local strings = {} ---@type string[]
 		for _, t in ipairs(self.types) do
-			table.insert(strings, t:sub_repr(visited))
+			table.insert(strings, t:debug_substring(visited))
 		end
 		table.sort(strings)
 		return string.format("[%s]", table.concat(strings, " | "))
@@ -1273,10 +1276,10 @@ do -- Intersection
 
 	---@param visited { [type-track.Type]: number?, n: number }
 	---@return string
-	function IntersectionInst:repr(visited)
+	function IntersectionInst:debug_string(visited)
 		local strings = {}
 		for _, t in ipairs(self.types) do
-			table.insert(strings, t:sub_repr(visited))
+			table.insert(strings, t:debug_substring(visited))
 		end
 		table.sort(strings)
 		return string.format("[%s]", table.concat(strings, " & "))
@@ -1335,8 +1338,12 @@ do -- Literal
 
 	---@param visited { [type-track.Type]: number?, n: number }
 	---@return string
-	function LiteralInst:repr(visited)
-		return string.format('["%s": %s]', self.value, self.ops:sub_repr(visited))
+	function LiteralInst:debug_string(visited)
+		return string.format(
+			'["%s": %s]',
+			self.value,
+			self.ops:debug_substring(visited)
+		)
 	end
 end
 
@@ -1350,7 +1357,7 @@ do -- Unknown
 	---@operator add(type-track.Type): type-track.Union
 	local UnknownInst = UnknownClass --[[@as type-track.Unknown]]
 
-	UnknownInst.repr_name = "unknown"
+	UnknownInst.debug_name = "unknown"
 
 	---Evaluations are never valid on `Unknown`.
 	---@param op string
@@ -1380,7 +1387,7 @@ do -- Never
 	---@operator add(type-track.Type): type-track.Union
 	local NeverInst = NeverClass --[[@as type-track.Never]]
 
-	NeverInst.repr_name = "never"
+	NeverInst.debug_name = "never"
 
 	---Evaluations are always valid on `Never` and return itself.
 	---@param op string
@@ -1499,12 +1506,12 @@ do -- GenericOperation
 	end
 
 	---@param visited { [type-track.Type]: number?, n: number }
-	function GenericOperationInst:__tostring(visited)
+	function GenericOperationInst:debug_string(visited)
 		visited = visited or { n = 0 }
 		return string.format(
 			"{ %s(): %s }",
 			self.op,
-			self.derive_fn(unknown_var):sub_repr(visited)
+			self.derive_fn(unknown_var):debug_substring(visited)
 		)
 	end
 end
@@ -1647,9 +1654,9 @@ do -- Free
 	end
 
 	---@return string
-	function FreeInst:repr(...)
+	function FreeInst:debug_string(...)
 		local val = self:unwrap()
-		return val.repr_name or val:repr(...)
+		return val.debug_name or val:debug_string(...)
 	end
 
 	function FreeInst:__tostring()
