@@ -1340,149 +1340,6 @@ do -- Literal
 	end
 end
 
-do -- Free
-	---@class type-track.Free : type-track.Type
-	---@field value type-track.Type?
-	---@operator mul(type-track.Type): type-track.Intersection
-	---@operator add(type-track.Type): type-track.Union
-	local FreeInst = muun("Free", Type)
-
-	Free = FreeInst --[[@as type-track.Free.Class]]
-
-	---@return type-track.Type
-	function FreeInst:unwrap()
-		local visited = { [self] = true } --- @type { [type-track.Type]: true? }
-		local result = self ---@type type-track.Type
-
-		while result.__class == Free do
-			---@cast result type-track.Free
-			result = assert(result.value, "attempt to use an empty Free type")
-			assert(not visited[result], "Free type is cyclic")
-			visited[result] = true
-		end
-
-		return result
-	end
-
-	---@type fun(elem: type-track.Type, free: type-track.Free, value: type-track.Type): type-track.Type
-	local redefine
-
-	---@type { [any]: fun(elem: type-track.Type, free: type-track.Free, value: type-track.Type): type-track.Type }
-	local redefine_class_handlers = {
-		---@param elem type-track.Free
-		[Free] = function(elem, free, value)
-			return redefine(
-				assert(elem.value, "attempt to use an empty Free type"),
-				free,
-				value
-			)
-		end,
-		---@param elem type-track.Operation
-		[Operation] = function(elem, free, value)
-			return Operation(
-				elem.op,
-				redefine(elem.domain, free, value),
-				redefine(elem.range, free, value)
-			)
-		end,
-		---@param elem type-track.Tuple
-		[Tuple] = function(elem, free, value)
-			local new_types = {}
-			for i, t in ipairs(elem.types) do
-				new_types[i] = redefine(t, free, value)
-			end
-			local new_var_arg = elem.var_arg and redefine(elem.var_arg, free, value)
-			return Tuple(new_types, new_var_arg)
-		end,
-		---@param elem type-track.Union
-		[Union] = function(elem, free, value)
-			local new_types = {}
-			for i, t in ipairs(elem.types) do
-				new_types[i] = redefine(t, free, value)
-			end
-			return Union(new_types)
-		end,
-		---@param elem type-track.Intersection
-		[Intersection] = function(elem, free, value)
-			local new_types = {}
-			for i, t in ipairs(elem.types) do
-				new_types[i] = redefine(t, free, value)
-			end
-			return Intersection(new_types)
-		end,
-		---@param elem type-track.Literal
-		[Literal] = function(elem, free, value)
-			return Literal(elem.value, redefine(elem.ops, free, value))
-		end,
-	}
-
-	---@param elem type-track.Type
-	---@param free type-track.Free
-	---@param value type-track.Type
-	---@return type-track.Type
-	function redefine(elem, free, value)
-		if elem == free then
-			return value
-		elseif elem == Unknown or elem == Never then
-			return elem
-		else
-			local handler = assert(
-				redefine_class_handlers[elem.__class],
-				"unhandled type in redefine"
-			)
-			return handler(elem, free, value)
-		end
-	end
-
-	function FreeInst:define(value)
-		return redefine(value, self, value)
-	end
-
-	---@return type-track.Type? range
-	function FreeInst:eval(...)
-		return self:unwrap():eval(...)
-	end
-
-	---@return type-track.Type?
-	function FreeInst:get_domain(...)
-		return self:unwrap():get_domain(...)
-	end
-
-	---@return type-track.Type?
-	function FreeInst:at(...)
-		return self:unwrap():at(...)
-	end
-
-	---@return type-track.Type?
-	function FreeInst:normalize(...)
-		if self.normalized then
-			return self.normalized
-		end
-
-		return self:unwrap():normalize(...)
-	end
-
-	---@return string
-	function FreeInst:repr(...)
-		local val = self:unwrap()
-		return val.repr_name or val:repr(...)
-	end
-
-	function FreeInst:__tostring()
-		local val = self ---@type type-track.Type?
-		while val and val.__class == Free do
-			---@cast val type-track.Free
-			val = val.value
-		end
-
-		if val then
-			return tostring(val)
-		else
-			return "?"
-		end
-	end
-end
-
 do -- Unknown
 	---@class type-track.Unknown.Class
 	---@overload fun(): type-track.Unknown
@@ -1652,15 +1509,173 @@ do -- GenericOperation
 	end
 end
 
+do -- Free
+	---@class type-track.Free : type-track.Type
+	---@field value type-track.Type?
+	---@operator mul(type-track.Type): type-track.Intersection
+	---@operator add(type-track.Type): type-track.Union
+	local FreeInst = muun("Free", Type)
+
+	Free = FreeInst --[[@as type-track.Free.Class]]
+
+	---recursively reveals `Free.value` until it arrives at a concrete type
+	---@return type-track.Type
+	function FreeInst:unwrap()
+		local visited = { [self] = true } --- @type { [type-track.Type]: true? }
+		local result = self ---@type type-track.Type
+
+		while result.__class == Free do
+			---@cast result type-track.Free
+			result = assert(result.value, "attempt to use an empty Free type")
+			assert(not visited[result], "Free type is cyclic")
+			visited[result] = true
+		end
+
+		return result
+	end
+
+	---@type fun(elem: type-track.Type, free: type-track.Free, replacement: type-track.Type, visited: { [type-track.Type]: type-track.Type? }): type-track.Type
+	local sub_reify
+
+	---@type { [any]: fun(elem: type-track.Type, free: type-track.Free, replacement: type-track.Type, visited: { [type-track.Type]: type-track.Type? }) }
+	local reify_class_handlers = {
+		---@param elem type-track.Free
+		[Free] = function(elem, free, replacement, visited)
+			elem.value = sub_reify(elem.value, free, replacement, visited)
+		end,
+		---@param elem type-track.Operation
+		[Operation] = function(elem, free, replacement, visited)
+			elem.domain = sub_reify(elem.domain, free, replacement, visited)
+			elem.range = sub_reify(elem.range, free, replacement, visited)
+		end,
+		---@param elem type-track.Tuple
+		[Tuple] = function(elem, free, replacement, visited)
+			local types = elem.types
+			for i, t in ipairs(types) do
+				types[i] = sub_reify(t, free, replacement, visited)
+			end
+			if elem.var_arg then
+				elem.var_arg = sub_reify(elem.var_arg, free, replacement, visited)
+			end
+		end,
+		---@param elem type-track.Union
+		[Union] = function(elem, free, replacement, visited)
+			local types = elem.types
+			for i, t in ipairs(types) do
+				types[i] = sub_reify(t, free, replacement, visited)
+			end
+		end,
+		---@param elem type-track.Intersection
+		[Intersection] = function(elem, free, replacement, visited)
+			local types = elem.types
+			for i, t in ipairs(types) do
+				types[i] = sub_reify(t, free, replacement, visited)
+			end
+		end,
+		---@param elem type-track.Literal
+		[Literal] = function(elem, free, replacement, visited)
+			elem.ops = sub_reify(elem.ops, free, replacement, visited)
+		end,
+
+		-- does nothing
+		[GenericOperation] = function() end,
+	}
+
+	---@param elem type-track.Type
+	---@param free type-track.Free
+	---@param replacement type-track.Type
+	---@param visited { [type-track.Type]: type-track.Type? }
+	---@return type-track.Type
+	function sub_reify(elem, free, replacement, visited)
+		local found = visited[elem]
+		if found then
+			return found
+		end
+
+		if elem == free then
+			visited[elem] = replacement
+			return replacement
+		else
+			visited[elem] = elem
+			if elem ~= Unknown and elem ~= Never then
+				local handler = assert(
+					reify_class_handlers[elem.__class],
+					"unhandled type in redefine"
+				)
+				if handler then
+					handler(elem, free, replacement, visited)
+				end
+			end
+		end
+
+		return elem
+	end
+
+	---modifies `value` in place such that any instance of `self` is replaced with
+	---`replacement`. `replacement` defaults to `self.value`, in which case
+	---`self.value` must be non-empty.
+	---@param value type-track.Type
+	---@param replacement type-track.Type?
+	function FreeInst:reify(value, replacement)
+		replacement = replacement
+			or assert(self.value, "attempt to use an empty Free type")
+		sub_reify(value, self, replacement, { [self] = replacement })
+	end
+
+	---@return type-track.Type? range
+	function FreeInst:eval(...)
+		return self:unwrap():eval(...)
+	end
+
+	---@return type-track.Type?
+	function FreeInst:get_domain(...)
+		return self:unwrap():get_domain(...)
+	end
+
+	---@return type-track.Type?
+	function FreeInst:at(...)
+		return self:unwrap():at(...)
+	end
+
+	---@return type-track.Type?
+	function FreeInst:normalize(...)
+		if self.normalized then
+			return self.normalized
+		end
+
+		return self:unwrap():normalize(...)
+	end
+
+	---@return string
+	function FreeInst:repr(...)
+		local val = self:unwrap()
+		return val.repr_name or val:repr(...)
+	end
+
+	function FreeInst:__tostring()
+		local val = self ---@type type-track.Type?
+		while val and val.__class == Free do
+			---@cast val type-track.Free
+			val = val.value
+		end
+
+		if val then
+			return tostring(val)
+		else
+			return "?"
+		end
+	end
+end
+
 meta.Tuple = Tuple
 meta.Operation = Operation
 meta.Union = Union
 meta.Intersection = Intersection
 meta.Literal = Literal
-meta.Free = Free
 meta.Never = Never
 meta.Unknown = Unknown
 meta.GenericOperation = GenericOperation
+meta.Free = Free
 
 meta.Type = Type
 
