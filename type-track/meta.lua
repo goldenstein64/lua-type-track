@@ -1617,7 +1617,7 @@ do -- GenericOperation
 	---returns a concrete `Operation` that is a subset of `superset` for this
 	---type's `op`
 	---
-	---If `nil` is returned, then `supertype` could not be matched for this
+	---If `nil` is returned, then `superset` could not be matched for this
 	---operator.
 	---@param superset type-track.Type
 	---@return type-track.Type? concrete
