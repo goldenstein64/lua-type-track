@@ -233,8 +233,9 @@ local function is_subset(subset, superset)
 			-- handles (A & C) -> (B | D) <: (A -> B) | (C -> D)
 			return is_subset(superset_domain, subset.domain)
 				and is_subset(subset.range, superset_range)
-		else
-			return is_subset_of_any(subset, superset.types)
+		end
+
+		return is_subset_of_any(subset, superset.types)
 	elseif super_cls == Intersection then
 		---@cast superset type-track.Intersection
 		---@cast subset type-track.Type
