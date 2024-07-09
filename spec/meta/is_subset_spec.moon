@@ -1,6 +1,8 @@
 import
 	is_subset
-	Type, Tuple, Operation, Literal, GenericOperation, Unknown
+	Type, Tuple, Operation, Literal, GenericOperation
+	Unknown, Never
+	Intersection, Union
 from require 'type-track.meta'
 
 
@@ -129,3 +131,36 @@ describe 'is_subset', ->
 
 		assert.is_true (is_subset type1, type2), 'type1 </: type2'
 		assert.is_true (is_subset type2, type1), 'type2 </: type1'
+
+	it 'rejects map_of(A, C) <: map_of(A, BC) and map_of(A, BC) <: map(A, C) given BC <: C', ->
+		map_of = (K, V) ->
+			Intersection {
+				Operation 'index', K, V
+				Operation 'newindex', Tuple({ K, V }), Never
+			}
+
+		BC = B * C
+
+		assert.is_true is_subset BC, C
+		assert.is_false is_subset C, BC
+
+		mapC = map_of A, C
+		mapBC = map_of A, BC
+
+		-- these are invariant
+		assert.is_false is_subset mapBC, mapC
+		assert.is_false is_subset mapC, mapBC
+
+	it 'accepts read_map_of(A, BC) <: read_map_of(A, C) given BC <: C', ->
+		read_map_of = (K, V) -> Operation 'index', K, V
+
+		BC = B * C
+
+		assert.is_true is_subset BC, C
+		assert.is_false is_subset C, BC
+
+		mapC = read_map_of A, C
+		mapBC = read_map_of A, BC
+
+		assert.is_true is_subset mapBC, mapC
+		assert.is_false is_subset mapC, mapBC
