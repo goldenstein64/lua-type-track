@@ -44,7 +44,7 @@ end
 
 local T = Tuple
 
-local unit = T({})
+local unit = Tuple.Unit
 
 local number = Free()
 local _string = Free()
@@ -477,17 +477,41 @@ local _require = func(_string, Unknown)
 -- <As...>(As...) -> (As...)
 local _assert = gen_func(function(tup)
 	return tup, tup
-end, function(params, returns)
-	return (params * returns):normalize()
+end, function(domain, range)
+	if range then
+		return (domain * range):normalize()
+	else
+		return domain
+	end
 end)
 
+local _collectgarbage = func(_nil, number)
+	* func(unit, number)
+	* func(string_of("collect"), number)
+	* func(string_of("stop"), number)
+	* func(string_of("restart"), number)
+	* func(string_of("count"), number)
+	* func(string_of("step"), boolean)
+	* func(string_of("setpause"), number)
+	* func(string_of("setstepmul"), number)
+	* func(Tuple({ string_of("setpause"), num_or_nil }), number)
+	* func(Tuple({ string_of("setstepmul"), num_or_nil }), number)
+
+local _dofile = func(string_or_nil, unknown_var)
+
+local _error = func(Tuple({ _string, num_or_nil }), Never)
+	* func(_string, Never)
+	* func(unit, Never)
+
+local __G = _table
+
+local _getfenv
+do
+	local getfenv_result = map_of(_string, Unknown) + _nil
+	_getfenv = func(unit, getfenv_result) * func(_function + _nil, getfenv_result)
+end
+
 -- globals:
--- assert()
--- collectgarbage()
--- dofile()
--- error()
--- _G
--- getfenv()
 -- getmetatable()
 -- ipairs()
 -- load()
@@ -535,6 +559,11 @@ local lua51 = {
 	module = _module,
 	require = _require,
 	assert = _assert,
+	collectgarbage = _collectgarbage,
+	dofile = _dofile,
+	error = _error,
+	_G = __G,
+	getfenv = _getfenv,
 }
 
 for k, t in pairs(lua51) do
