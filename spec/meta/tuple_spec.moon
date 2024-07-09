@@ -101,10 +101,10 @@ describe 'Tuple', ->
 			assert.equal nil, tup\at 3
 
 	describe 'normalize', ->
-		it 'returns itself when empty', ->
+		it 'returns Tuple.Unit when empty', ->
 			tup = Tuple {}
 
-			assert.equal tup, tup\normalize!
+			assert.equal Tuple.Unit, tup\normalize!
 
 		it 'returns its single element if no var arg', ->
 			tup = Tuple { A }

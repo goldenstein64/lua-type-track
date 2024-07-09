@@ -777,9 +777,9 @@ do -- Tuple
 			end
 		else
 			-- 0 values is NOT the same as Never
-			-- but a unit tuple unifies to itself
+			-- but a unit tuple unifies to `Tuple.Unit`
 			if arg_count == 0 and not self_var_arg then
-				return self
+				return Tuple.Unit
 			elseif arg_count == 1 then
 				return self.types[1]:normalize(visited)
 			end
