@@ -34,10 +34,10 @@ end
 local function axiom(t)
 	if t.__class == Free then
 		---@cast t type-track.Free
-		t.unified = t.value
-		t.value.unified = t.value
+		t.normalized = t.value
+		t.value.normalized = t.value
 	else
-		t.unified = t
+		t.normalized = t
 	end
 	return t
 end

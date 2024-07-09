@@ -32,17 +32,17 @@ describe 'Intersection', ->
 
 		it 'simplifies nested intersections', ->
 			inter = Intersection { A, Intersection { B, C } }
-			unified = inter\normalize!
-			for t in *unified.types
+			normalized = inter\normalize!
+			for t in *normalized.types
 				assert.is_false t\is_instance Intersection
 
 		it 'simplifies nested intersections with duplicates', ->
 			inter = Intersection { A, Intersection { A, B } }
 
-			unified = inter\normalize!
+			normalized = inter\normalize!
 
-			assert.equal 2, #unified.types
-			{ elem1, elem2 } = unified.types
+			assert.equal 2, #normalized.types
+			{ elem1, elem2 } = normalized.types
 			assert.is_true elem1.value == "A" or elem1.value == "B"
 			if elem1.value == "A"
 				assert.equal "B", elem2.value
@@ -57,11 +57,11 @@ describe 'Intersection', ->
 			assert.is_true is_subset op1, op2
 
 			inter = Intersection { op1, op2 }
-			unified = inter\normalize!
+			normalized = inter\normalize!
 
 			-- normalizeing should return the subset, i.e. op1
-			assert.is_true is_subset op1, unified
-			assert.is_true is_subset unified, op1
+			assert.is_true is_subset op1, normalized
+			assert.is_true is_subset normalized, op1
 
 		it 'works with order-1 cyclic intersections', ->
 			op = Operation 'call', A, B
@@ -71,17 +71,17 @@ describe 'Intersection', ->
 
 			expected = op
 
-			unified = inter\normalize!
-			assert.not_nil unified
-			assert.is_true is_subset unified, expected
-			assert.is_true is_subset expected, unified
+			normalized = inter\normalize!
+			assert.not_nil normalized
+			assert.is_true is_subset normalized, expected
+			assert.is_true is_subset expected, normalized
 
 		it 'returns nil for order-2 cyclic intersections', ->
 			_string = Free!
 			number = Free!
 
 			number.value = Operation "add", number, number
-			number.value.unified = number.value -- already unified
+			number.value.normalized = number.value -- already normalized
 
 			string_of = memoize (value) -> Literal value, _string
 			concat_call = Operation "concat", _string + number, _string

@@ -138,22 +138,22 @@ local function is_subset(subset, superset)
 	end
 
 	do
-		local unified = subset:normalize()
-		if not unified then
+		local normalized = subset:normalize()
+		if not normalized then
 			return false
 		end
-		subset = unified
+		subset = normalized
 	end
 	if not subset then
 		return false
 	end
 
 	do
-		local unified = superset:normalize()
-		if not unified then
+		local normalized = superset:normalize()
+		if not normalized then
 			return false
 		end
-		superset = unified
+		superset = normalized
 	end
 
 	if rawequal(subset, superset) then
@@ -339,7 +339,7 @@ end
 
 do -- Type
 	---@class type-track.Type : Inheritable
-	---@field unified type-track.Type?
+	---@field normalized type-track.Type?
 	---@field repr_name string?
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator add(type-track.Type): type-track.Union
@@ -419,7 +419,7 @@ do -- Type
 	---converts a type into its simplest form.
 	---
 	---- If unification succeeds, it returns a `Type`. It may be itself if it was
-	---  already unified.
+	---  already normalized.
 	---
 	---- Otherwise, it returns `nil`. Typically, this means the type is invalid.
 	---
@@ -428,8 +428,8 @@ do -- Type
 	---@param visited? { [type-track.Type]: true? }
 	---@return type-track.Type?
 	function TypeInst:normalize(visited)
-		if self.unified then
-			return self.unified
+		if self.normalized then
+			return self.normalized
 		end
 
 		if not visited then
@@ -445,8 +445,8 @@ do -- Type
 			return nil
 		end
 
-		self.unified = result
-		result.unified = result
+		self.normalized = result
+		result.normalized = result
 
 		return result
 	end
@@ -461,10 +461,10 @@ do -- Type
 	---- Otherwise, it returns `nil`.
 	---
 	---The public method makes sure to call `_normalize` only when the type hasn't
-	---been unified before and the type wasn't already visited during a parent
+	---been normalized before and the type wasn't already visited during a parent
 	---unification.
 	---@param visited { [type-track.Type]: true? }
-	---@return type-track.Type? unified
+	---@return type-track.Type? normalized
 	function TypeInst:_normalize(visited)
 		return self
 	end
@@ -769,10 +769,10 @@ do -- Tuple
 		local arg_count = #self.types
 		local has_args = arg_count > 0
 		local self_var_arg = self.var_arg
-		local unified_var_arg = nil ---@type type-track.Type?
+		local normalized_var_arg = nil ---@type type-track.Type?
 		if self_var_arg then
-			unified_var_arg = self_var_arg:normalize(visited)
-			if not unified_var_arg then
+			normalized_var_arg = self_var_arg:normalize(visited)
+			if not normalized_var_arg then
 				return nil
 			end
 		else
@@ -785,44 +785,44 @@ do -- Tuple
 			end
 		end
 
-		local unified_args = {} ---@type type-track.Type[]
+		local normalized_args = {} ---@type type-track.Type[]
 		if has_args then
 			for i = 1, arg_count - 1 do
 				local elem = self.types[i]
-				local unified = elem:normalize(visited)
-				if not unified then
+				local normalized = elem:normalize(visited)
+				if not normalized then
 					return nil
 				end
 
-				unified_args[i] = unified:at(1)
+				normalized_args[i] = normalized:at(1)
 			end
 
 			local last_elem = self.types[arg_count]
-			local last_unified = last_elem:normalize(visited)
-			if not last_unified then
+			local last_normalized = last_elem:normalize(visited)
+			if not last_normalized then
 				return nil
 			end
 
-			if last_unified.__class == Tuple then
-				---@cast last_unified type-track.Tuple
-				local last_var_arg = last_unified.var_arg
+			if last_normalized.__class == Tuple then
+				---@cast last_normalized type-track.Tuple
+				local last_var_arg = last_normalized.var_arg
 				if self_var_arg and last_var_arg then
 					if not is_subset(last_var_arg, self_var_arg) then
 						return nil
 					end
 				elseif last_var_arg then
-					unified_var_arg = last_var_arg
+					normalized_var_arg = last_var_arg
 				end
 
-				for _, sub_elem in ipairs(last_unified.types) do
-					table.insert(unified_args, sub_elem)
+				for _, sub_elem in ipairs(last_normalized.types) do
+					table.insert(normalized_args, sub_elem)
 				end
 			else
-				table.insert(unified_args, last_unified)
+				table.insert(normalized_args, last_normalized)
 			end
 		end
 
-		return Tuple(unified_args, unified_var_arg)
+		return Tuple(normalized_args, normalized_var_arg)
 	end
 
 	local VAR_STR = "...%s"
@@ -962,18 +962,18 @@ do -- Union
 				goto continue
 			end
 
-			local unified = elem:normalize(visited)
-			if not unified then
+			local normalized = elem:normalize(visited)
+			if not normalized then
 				return nil
-			elseif unified == Unknown then
+			elseif normalized == Unknown then
 				return { Unknown }
-			elseif unified.__class == Union then
-				---@cast unified type-track.Union
-				for _, sub_elem in ipairs(unified.types) do
+			elseif normalized.__class == Union then
+				---@cast normalized type-track.Union
+				for _, sub_elem in ipairs(normalized.types) do
 					union_insert(result, sub_elem)
 				end
 			else
-				union_insert(result, unified)
+				union_insert(result, normalized)
 			end
 
 			::continue::
@@ -1192,20 +1192,20 @@ do -- Intersection
 				goto continue
 			end
 
-			local unified = elem:normalize(visited)
-			if not unified then
+			local normalized = elem:normalize(visited)
+			if not normalized then
 				return nil
-			elseif unified == Never then
+			elseif normalized == Never then
 				return { Never }
-			elseif unified.__class == Intersection then
-				---@cast unified type-track.Intersection
-				for _, sub_elem in ipairs(unified.types) do
-					-- `sub_elem` is already unified here, because that's what
+			elseif normalized.__class == Intersection then
+				---@cast normalized type-track.Intersection
+				for _, sub_elem in ipairs(normalized.types) do
+					-- `sub_elem` is already normalized here, because that's what
 					-- `Intersection:normalize()` does
 					intersection_insert(result, sub_elem)
 				end
 			else
-				intersection_insert(result, unified)
+				intersection_insert(result, normalized)
 			end
 			::continue::
 		end
@@ -1236,7 +1236,7 @@ do -- Intersection
 		end
 
 		if not has_unions then
-			-- `types` is already unified here by `flatten_intersection`
+			-- `types` is already normalized here by `flatten_intersection`
 			return Intersection(types)
 		end
 
@@ -1325,12 +1325,12 @@ do -- Literal
 	---@param visited? { [type-track.Type]: true? }
 	---@return type-track.Type?
 	function LiteralInst:_normalize(visited)
-		local unified_ops = self.ops:normalize(visited)
-		if not unified_ops then
+		local normalized_ops = self.ops:normalize(visited)
+		if not normalized_ops then
 			return nil
 		end
 
-		return Literal(self.value, unified_ops)
+		return Literal(self.value, normalized_ops)
 	end
 
 	---@param visited { [type-track.Type]: number?, n: number }
@@ -1455,8 +1455,8 @@ do -- Free
 
 	---@return type-track.Type?
 	function FreeInst:normalize(...)
-		if self.unified then
-			return self.unified
+		if self.normalized then
+			return self.normalized
 		end
 
 		return self:unwrap():normalize(...)

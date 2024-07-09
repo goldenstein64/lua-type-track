@@ -124,20 +124,20 @@ describe 'Tuple', ->
 		it 'truncates middle tuples', ->
 			tup = Tuple { A, (Tuple { A, B }), C }
 
-			unified = tup\normalize!
-			assert.equal "A", unified\at(1).value
-			assert.equal "A", unified\at(2).value
-			assert.equal "C", unified\at(3).value
+			normalized = tup\normalize!
+			assert.equal "A", normalized\at(1).value
+			assert.equal "A", normalized\at(2).value
+			assert.equal "C", normalized\at(3).value
 
 		it 'flattens the last tuple', ->
 			tup = Tuple { A, B, (Tuple { A, B }, C) }
 
-			unified = tup\normalize!
-			assert.equal "A", unified\at(1).value
-			assert.equal "B", unified\at(2).value
-			assert.equal "A", unified\at(3).value
-			assert.equal "B", unified\at(4).value
-			assert.equal "C", unified.var_arg.value
+			normalized = tup\normalize!
+			assert.equal "A", normalized\at(1).value
+			assert.equal "B", normalized\at(2).value
+			assert.equal "A", normalized\at(3).value
+			assert.equal "B", normalized\at(4).value
+			assert.equal "C", normalized.var_arg.value
 
 		it 'rejects conflicting var_arg on last tuple', ->
 			tup = Tuple { A, (Tuple {}, B) }, C
@@ -147,9 +147,9 @@ describe 'Tuple', ->
 		it 'accepts subset var_arg on last tuple', ->
 			tup = Tuple { A, (Tuple {}, B) }, B + C
 
-			unified = tup\normalize!
-			unified_var = unified.var_arg
+			normalized = tup\normalize!
+			normalized_var = normalized.var_arg
 			expected_var = B + C
 			assert.equal "A", tup\at(1).value
-			assert.is_true is_equiv expected_var, unified_var
+			assert.is_true is_equiv expected_var, normalized_var
 			
