@@ -106,6 +106,21 @@ describe 'Tuple', ->
 
 			assert.equal tup, tup\normalize!
 
+		it 'returns its single element if no var arg', ->
+			tup = Tuple { A }
+
+			normalized = tup\normalize!
+			assert.equal "Literal", normalized.__class.__name
+			assert.equal "A", normalized.value
+
+		it 'still returns a tuple if var arg', ->
+			tup = Tuple { A }, B
+
+			normalized = tup\normalize!
+			assert.equal "Tuple", normalized.__class.__name
+			assert.equal "A", normalized\at(1).value
+			assert.equal "B", normalized.var_arg.value
+
 		it 'truncates middle tuples', ->
 			tup = Tuple { A, (Tuple { A, B }), C }
 

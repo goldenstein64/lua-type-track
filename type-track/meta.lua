@@ -766,18 +766,28 @@ do -- Tuple
 	---@param visited { [type-track.Type]: true? }
 	---@return type-track.Type?
 	function TupleInst:_normalize(visited)
-		local has_args = #self.types > 0
+		local arg_count = #self.types
+		local has_args = arg_count > 0
 		local self_var_arg = self.var_arg
-		-- 0 values is NOT the same as Never
-		-- but a unit tuple unifies to itself
-		if not has_args and not self_var_arg then
-			return self
+		local unified_var_arg = nil ---@type type-track.Type?
+		if self_var_arg then
+			unified_var_arg = self_var_arg:normalize(visited)
+			if not unified_var_arg then
+				return nil
+			end
+		else
+			-- 0 values is NOT the same as Never
+			-- but a unit tuple unifies to itself
+			if arg_count == 0 and not self_var_arg then
+				return self
+			elseif arg_count == 1 then
+				return self.types[1]:normalize(visited)
+			end
 		end
 
 		local unified_args = {} ---@type type-track.Type[]
-		local unified_var_arg = nil ---@type type-track.Type?
 		if has_args then
-			for i = 1, #self.types - 1 do
+			for i = 1, arg_count - 1 do
 				local elem = self.types[i]
 				local unified = elem:normalize(visited)
 				if not unified then
@@ -787,7 +797,7 @@ do -- Tuple
 				unified_args[i] = unified:at(1)
 			end
 
-			local last_elem = self.types[#self.types]
+			local last_elem = self.types[arg_count]
 			local last_unified = last_elem:normalize(visited)
 			if not last_unified then
 				return nil
@@ -809,13 +819,6 @@ do -- Tuple
 				end
 			else
 				table.insert(unified_args, last_unified)
-			end
-		end
-
-		if self_var_arg then
-			unified_var_arg = self_var_arg:normalize(visited)
-			if not unified_var_arg then
-				return nil
 			end
 		end
 
