@@ -838,6 +838,9 @@ do -- Tuple
 
 		return string.format("(%s)", table.concat(strings, ", "))
 	end
+
+	-- the unit type, `()`
+	Tuple.Unit = Tuple({})
 end
 
 do -- Union
