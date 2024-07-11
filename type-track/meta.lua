@@ -370,8 +370,8 @@ do -- Type
 	---For each class:
 	---- `Operation`s have contravariant domains and covariant ranges
 	---- `Tuple`s have covariant elements
-	---- `Union`s have covariant elements
-	---- `Intersection`s have contravariant elements (?)
+	---- `Union`s don't have a notion of variance
+	---- `Intersection`s don't have a notion of variance
 	---- `Literal`s have invariant values and covariant supporting operators
 	---- `Free` types are covariant
 	---- `GenericOperation`s' variance are determined by their inference function
@@ -523,32 +523,24 @@ do -- Type
 		return Intersection(values)
 	end
 
-	---@param visited { [type-track.Type]: number?, n: number }
-	---@return string
-	function TypeInst:debug_substring(visited)
-		if self.__class == Free then
-			---@cast self type-track.Free
-			self = self:unwrap()
+	---@param visited { [type-track.Type]: any }
+	function TypeInst:debug_subdata(visited)
+		local found = visited[self]
+		if not found then
+			visited[self] = true
+			if self.debug_name then
+				found = self.debug_name
+			else
+				found = self:debug_data(visited)
+			end
+			visited[self] = found
 		end
-
-		if self.debug_name then
-			return self.debug_name
-		end
-
-		local visit_id = visited[self]
-		if visit_id then
-			return string.format("<%d>", visit_id)
-		else
-			visited.n = visited.n + 1
-			visit_id = visited.n
-			visited[self] = visit_id
-			return string.format("<%d>%s", visit_id, self:debug_string(visited))
-		end
+		return found
 	end
 
-	---@param visited { [type-track.Type]: number?, n: number }
-	---@return string
-	function TypeInst:debug_string(visited)
+	---@param visited { [type-track.Type]: any }
+	---@return table
+	function TypeInst:debug_data(visited)
 		error("not implemented")
 	end
 
@@ -556,7 +548,11 @@ do -- Type
 	---the same string as another type, they are the same type.
 	---@return string
 	function TypeInst:__tostring()
-		return self.debug_name or self:debug_substring({ n = 0 })
+		local ok, inspect = pcall(require, "inspect")
+		assert(ok, "inspect module is required to call tostring(Type)")
+
+		local data = self:debug_subdata({})
+		return inspect(data)
 	end
 
 	function Type:__inherited(cls)
@@ -644,15 +640,13 @@ do -- Operation
 		return Operation(self.op, domain, range)
 	end
 
-	---@param visited { [type-track.Type]: number?, n: number }
-	---@return string
-	function OperationInst:debug_string(visited)
-		return string.format(
-			"{ %s: %s -> %s }",
-			self.op,
-			self.domain:debug_substring(visited),
-			self.range:debug_substring(visited)
-		)
+	function OperationInst:debug_data(visited)
+		return {
+			_type = "Operation",
+			op = self.op,
+			domain = self.domain:debug_subdata(visited),
+			range = self.range:debug_subdata(visited),
+		}
 	end
 end
 
@@ -825,24 +819,19 @@ do -- Tuple
 		return Tuple(normalized_args, normalized_var_arg)
 	end
 
-	local VAR_STR = "...%s"
-
-	---@param visited { [type-track.Type]: number?, n: number }
-	---@return string
-	function TupleInst:debug_string(visited)
-		local strings = {} ---@type string[]
+	---@param visited { [type-track.Type]: any }
+	---@return table
+	function TupleInst:debug_data(visited)
+		local types_data = {}
 		for _, t in ipairs(self.types) do
-			table.insert(strings, t:debug_substring(visited))
+			table.insert(types_data, t:debug_subdata(visited))
 		end
 
-		if self.var_arg then
-			table.insert(
-				strings,
-				VAR_STR:format(self.var_arg:debug_substring(visited))
-			)
-		end
-
-		return string.format("(%s)", table.concat(strings, ", "))
+		return {
+			_type = "Tuple",
+			types = types_data,
+			var_arg = self.var_arg and self.var_arg:debug_subdata(visited),
+		}
 	end
 
 	-- the unit type, `()`
@@ -1052,15 +1041,15 @@ do -- Union
 		end
 	end
 
-	---@param visited { [type-track.Type]: number?, n: number }
-	---@return string
-	function UnionInst:debug_string(visited)
-		local strings = {} ---@type string[]
+	---@param visited { [type-track.Type]: any }
+	---@return table
+	function UnionInst:debug_data(visited)
+		local types_data = {}
 		for _, t in ipairs(self.types) do
-			table.insert(strings, t:debug_substring(visited))
+			table.insert(types_data, t:debug_subdata(visited))
 		end
-		table.sort(strings)
-		return string.format("[%s]", table.concat(strings, " | "))
+
+		return { _type = "Union", types = types_data }
 	end
 end
 
@@ -1274,15 +1263,15 @@ do -- Intersection
 		return distribute_unions(flattened, visited)
 	end
 
-	---@param visited { [type-track.Type]: number?, n: number }
-	---@return string
-	function IntersectionInst:debug_string(visited)
-		local strings = {}
+	---@param visited { [type-track.Type]: any }
+	---@return table
+	function IntersectionInst:debug_data(visited)
+		local types_data = {}
 		for _, t in ipairs(self.types) do
-			table.insert(strings, t:debug_substring(visited))
+			table.insert(types_data, t:debug_subdata(visited))
 		end
-		table.sort(strings)
-		return string.format("[%s]", table.concat(strings, " & "))
+
+		return { _type = "Intersection", types = types_data }
 	end
 end
 
@@ -1336,14 +1325,24 @@ do -- Literal
 		return Literal(self.value, normalized_ops)
 	end
 
-	---@param visited { [type-track.Type]: number?, n: number }
+	---@param visited { [type-track.Type]: type-track.Type._debug_visit_info?, n: number }
 	---@return string
 	function LiteralInst:debug_string(visited)
 		return string.format(
-			'["%s": %s]',
+			'{ "Literal", "%s", %s }',
 			self.value,
 			self.ops:debug_substring(visited)
 		)
+	end
+
+	---@param visited { [type-track.Type]: any }
+	---@return table
+	function LiteralInst:debug_data(visited)
+		return {
+			_type = "Literal",
+			value = self.value,
+			ops = self.ops:debug_subdata(visited),
+		}
 	end
 end
 
@@ -1371,6 +1370,12 @@ do -- Unknown
 	---@return type-track.Type?
 	function UnknownInst:at(i)
 		return Unknown
+	end
+
+	---@param visited { [type-track.Type]: any }
+	---@return table
+	function UnknownInst:debug_data(visited)
+		return { _type = "Unknown" }
 	end
 
 	Unknown = UnknownClass()
@@ -1401,6 +1406,12 @@ do -- Never
 	---@return type-track.Type?
 	function NeverInst:at(i)
 		return nil
+	end
+
+	---@param visited { [type-track.Type]: any }
+	---@return table
+	function NeverInst:debug_data(visited)
+		return { _type = "Never" }
 	end
 
 	Never = NeverClass()
@@ -1505,14 +1516,15 @@ do -- GenericOperation
 		return Operation(self.op, self_domain, self_range)
 	end
 
-	---@param visited { [type-track.Type]: number?, n: number }
-	function GenericOperationInst:debug_string(visited)
-		visited = visited or { n = 0 }
-		return string.format(
-			"{ %s(): %s }",
-			self.op,
-			self.derive_fn(unknown_var):debug_substring(visited)
-		)
+	---@param visited { [type-track.Type]: any }
+	---@return table
+	function GenericOperationInst:debug_data(visited)
+		return {
+			_type = "GenericOperation",
+			op = self.op,
+			derive = self.derive_fn,
+			infer = self.infer_fn,
+		}
 	end
 end
 
@@ -1548,7 +1560,10 @@ do -- Free
 	local reify_class_handlers = {
 		---@param elem type-track.Free
 		[Free] = function(elem, free, replacement, visited)
-			elem.value = sub_reify(elem.value, free, replacement, visited)
+			local elem_value = elem.value
+			if elem_value then
+				elem.value = sub_reify(elem_value, free, replacement, visited)
+			end
 		end,
 		---@param elem type-track.Operation
 		[Operation] = function(elem, free, replacement, visited)
@@ -1594,6 +1609,7 @@ do -- Free
 	---@param visited { [type-track.Type]: type-track.Type? }
 	---@return type-track.Type
 	function sub_reify(elem, free, replacement, visited)
+		assert(elem ~= nil, "elem is nil")
 		local found = visited[elem]
 		if found then
 			return found
@@ -1653,29 +1669,18 @@ do -- Free
 		return self:unwrap():normalize(...)
 	end
 
-	---@return string
-	function FreeInst:debug_string(...)
-		local val = self:unwrap()
-		return val.debug_name or val:debug_string(...)
-	end
-
-	function FreeInst:__tostring()
-		local val = self ---@type type-track.Type?
-		while val and val.__class == Free do
-			---@cast val type-track.Free
-			val = val.value
-		end
-
-		if val then
-			return tostring(val)
-		else
-			return "?"
-		end
+	---@param visited { [type-track.Type]: any }
+	---@return table
+	function FreeInst:debug_data(visited)
+		return {
+			_type = "Free",
+			value = self.value and self.value:debug_subdata(visited),
+		}
 	end
 end
 
-meta.Tuple = Tuple
 meta.Operation = Operation
+meta.Tuple = Tuple
 meta.Union = Union
 meta.Intersection = Intersection
 meta.Literal = Literal
