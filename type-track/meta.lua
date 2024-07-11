@@ -269,6 +269,20 @@ local function is_subset(subset, superset)
 	return false
 end
 
+---@param set1 type-track.Type
+---@param set2 type-track.Type
+---@return boolean
+local function is_overlapping(set1, set2)
+	if rawequal(set1, set2) then
+		return true
+	end
+
+	local set1_cls = set1.__class
+	local set2_cls = set2.__class
+
+	return true
+end
+
 ---accepts a type `subset` if it is a subset of all types in `superset_list`
 ---@param subset type-track.Type
 ---@param superset_list type-track.Type[]
@@ -381,6 +395,13 @@ do -- Type
 	---@return boolean
 	function Type.is_subset(subset, superset)
 		return false
+	end
+
+	---@param set1 type-track.Type
+	---@param set2 type-track.Type
+	---@return boolean
+	function Type.is_overlapping(set1, set2)
+		return true
 	end
 
 	---attempts to evaluate `op` on this type with `domain`
@@ -1298,7 +1319,13 @@ do -- Literal
 	---@return boolean
 	function Literal.is_subset(subset, superset)
 		return subset.value == superset.value
-			and is_subset(subset.ops, superset.ops)
+	end
+
+	---@param set1 type-track.Literal
+	---@param set2 type-track.Literal
+	---@return boolean
+	function Literal.is_overlapping(set1, set2)
+		return set1.value == set2.value
 	end
 
 	---@param op string
