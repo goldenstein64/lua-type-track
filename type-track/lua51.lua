@@ -1,5 +1,4 @@
 local meta_types = require("type-track.meta")
-local muun = require("type-track.muun")
 
 local Type, Tuple, Operation, Literal, Free, Never, Unknown, GenericOperation, is_subset =
 	meta_types.Type,
@@ -14,7 +13,7 @@ local Type, Tuple, Operation, Literal, Free, Never, Unknown, GenericOperation, i
 
 ---@generic F
 ---@param f F
----@return F
+---@return F, table
 local function memoize(f)
 	local cache = {}
 	return function(a, ...)
@@ -25,7 +24,8 @@ local function memoize(f)
 		end
 
 		return r
-	end
+	end,
+		cache
 end
 
 ---modifies the type so it unifies to itself
@@ -46,54 +46,78 @@ local T = Tuple
 
 local unit = Tuple.Unit
 
-local number = Free()
-local _string = Free()
-local stringlib = Free()
-local _false = Free()
+local stringlib_ref = Free()
 
-local falsy = Operation("truthy", Never, _false)
-
+local number, _string, string_or_num, concat_call
 ---@param value string
 ---@return type-track.Literal
 local function string_of(value)
 	return Literal(value, _string)
 end
-string_of = memoize(string_of)
+memoize(string_of)
+do
+	local number_ref = Free()
+	local string_ref = Free()
+	string_or_num = string_ref + number_ref
 
-local _nil = Literal(nil, Operation("type", Never, string_of("nil")) * falsy)
+	concat_call = Operation("concat", string_or_num, string_ref)
 
-local boolean = Operation("type", Never, string_of("boolean"))
+	local number_lit = string_of("number")
+	local string_lit = string_of("string")
+
+	number = Operation("type", Never, number_lit)
+		* Operation("add", number_ref, number_ref)
+		* Operation("sub", number_ref, number_ref)
+		* Operation("mul", number_ref, number_ref)
+		* Operation("div", number_ref, number_ref)
+		* Operation("mod", number_ref, number_ref)
+		* Operation("pow", number_ref, number_ref)
+		* concat_call
+
+	_string = Operation("type", Never, string_lit) * concat_call * stringlib_ref
+
+	string_ref:reify(_string, _string) --> concat_call -> string_or_num -> number
+	number_ref:reify(number, number) --> concat_call -> string_or_num -> _string
+	number_lit.ops = _string
+	string_lit.ops = _string
+
+	_string.debug_name = "type[string]"
+	number.debug_name = "type[number]"
+end
+
+local falsy, _nil, boolean, _true, _false
+do
+	local false_ref = Free()
+	falsy = Operation("truthy", Never, false_ref)
+
+	_nil = Literal(nil, Operation("type", Never, string_of("nil")) * falsy)
+
+	boolean = Operation("type", Never, string_of("boolean"))
+	_true = Literal(true, boolean)
+	_false = Literal(false, boolean * falsy)
+	false_ref:reify(_false, _false)
+	boolean.debug_name = "type[boolean]"
+	_true.debug_name = "true"
+	_false.debug_name = "false"
+	_nil.debug_name = "nil"
+end
+
 local thread = Operation("type", Never, string_of("thread"))
 local userdata = Operation("type", Never, string_of("userdata"))
-
-local string_or_num = _string + number
-local concat_call = Operation("concat", string_or_num, _string)
+thread.debug_name = "type[thread]"
+userdata.debug_name = "type[userdata]"
 
 local unknown_var = T({}, Unknown)
 
 local function_type = Operation("type", Never, string_of("function"))
+function_type.debug_name = "type[function]"
 local _function = function_type * Operation("call", unknown_var, unknown_var)
-
-local _true = Literal(true, boolean)
-_false.value = Literal(false, boolean * falsy)
-
-_string.value = Operation("type", Never, string_of("string"))
-	* concat_call
-	* stringlib
-
-number.value = Operation("type", Never, string_of("number"))
-	* Operation("add", number, number)
-	* Operation("sub", number, number)
-	* Operation("mul", number, number)
-	* Operation("div", number, number)
-	* Operation("mod", number, number)
-	* Operation("pow", number, number)
-	* concat_call
 
 local _table = Operation("type", Never, string_of("table"))
 	* Operation("index", Unknown, Unknown)
 	* Operation("newindex", T({ Unknown, Unknown }), Never)
 	* Operation("len", Never, number)
+_table.debug_name = "type[table]"
 
 ---@param params type-track.Type
 ---@param returns type-track.Type
@@ -148,7 +172,7 @@ end
 local string_or_num_or_nil = string_or_num + _nil
 
 -- stringlib
-stringlib.value = lib({
+local stringlib = lib({
 	byte = func(T({ string_or_num, num_or_nil, num_or_nil }), num_var),
 	char = func(string_or_num_var, _string),
 	dump = func(_function, _string),
@@ -194,6 +218,8 @@ local tablelib = lib({
 	remove = func(T({ _table, num_or_nil }), Unknown),
 	sort = func(T({ _table, _function }), unit),
 })
+stringlib_ref:reify(stringlib, stringlib)
+stringlib_ref:reify(_string, stringlib)
 
 local num_to_num = func(number, number)
 local num_to_num2 = func(number, T({ number, number }))
@@ -235,11 +261,11 @@ local mathlib = lib({
 
 local file_type = string_of("file") + string_of("closed file") + _nil
 
-local file = Free()
+local file_ref = Free()
 local fail = T({ _nil, _string })
 
 local true_or_fail = _true + fail
-local file_or_fail = file + fail
+local file_or_fail = file_ref + fail
 local num_or_fail = number + fail
 
 local file_open_mode = string_of("r")
@@ -272,12 +298,12 @@ local file_seek_mode_or_nil = file_seek_mode + _nil
 
 local vbuf_mode = string_of("no") + string_of("full") + string_of("line")
 
-local implicit_file = func(unit, file_or_fail) * func(file, true_or_fail)
+local implicit_file = func(unit, file_or_fail) * func(file_ref, true_or_fail)
 local open_file =
 	func(T({ string_or_num, file_open_mode + _nil }), file_or_fail)
 
 local iolib = lib({
-	close = func(file, true_or_fail) * func(unit, true_or_fail),
+	close = func(file_ref, true_or_fail) * func(unit, true_or_fail),
 	flush = func(unit, true_or_fail),
 	input = implicit_file,
 	lines = func(unit, func(unit, _string))
@@ -291,17 +317,23 @@ local iolib = lib({
 	write = func(string_or_num_var, file_or_fail),
 })
 
-file.value = userdata
+local file = userdata
 	* Operation("iolib.type", Never, string_of("file") + string_of("closed file"))
 	* lib({
-		close = func(file, true_or_fail),
-		flush = func(file, true_or_fail),
-		lines = func(file, func(unit, _string)),
-		read = func(T({ file }, file_read_mode), string_or_num_var),
-		seek = func(T({ file, file_seek_mode_or_nil, num_or_nil }), num_or_fail),
-		setvbuf = func(T({ file, vbuf_mode, num_or_nil }), true_or_fail),
-		write = func(T({ file }, string_or_num), file_or_fail),
+		close = func(file_ref, true_or_fail),
+		flush = func(file_ref, true_or_fail),
+		lines = func(file_ref, func(unit, _string)),
+		read = func(T({ file_ref }, file_read_mode), string_or_num_var),
+		seek = func(
+			T({ file_ref, file_seek_mode_or_nil, num_or_nil }),
+			num_or_fail
+		),
+		setvbuf = func(T({ file_ref, vbuf_mode, num_or_nil }), true_or_fail),
+		write = func(T({ file_ref }, string_or_num), file_or_fail),
 	})
+
+file_ref:reify(file, file)
+file_ref:reify(iolib, file)
 
 local osdate_table = lib({
 	year = number,
@@ -399,13 +431,15 @@ local debug_info = lib({
 	what = _string,
 })
 
+debug_info.debug_name = "debug_info"
+
 -- debuglib
 local debuglib = lib({
 	debug = func(unit, unit),
 	getfenv = func(_function, _table),
 	gethook = func(thread_or_nil, _nil + T({ debug_hook, _string, number })),
 	getinfo = func(T({ thread, func_or_num, _string }), _table)
-		* func(T({ func_or_num, _string }, _table))
+		* func(T({ func_or_num, _string }), _table)
 		* func(T({ thread, func_or_num }), debug_info)
 		* func(func_or_num, debug_info),
 	getlocal = func(T({ thread, number, number }), T({
