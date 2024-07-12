@@ -28,7 +28,7 @@ local Intersection
 
 ---a type that contains exactly one value
 ---@class type-track.Literal.Class
----@overload fun(value: unknown, ops: type-track.Type): type-track.Literal
+---@overload fun(value: unknown, of: type-track.Type): type-track.Literal
 local Literal
 
 ---@class type-track.Type.Class
@@ -255,7 +255,7 @@ local function is_subset(subset, superset)
 	elseif sub_cls == Literal then
 		---@cast subset type-track.Literal
 		---@cast superset type-track.Operation
-		return is_subset(subset.ops, superset)
+		return is_subset(subset.of, superset)
 	elseif sub_cls == Operation then
 		---@cast subset type-track.Operation
 		---@cast superset type-track.Literal
@@ -1340,7 +1340,7 @@ end
 do -- Literal
 	---@class type-track.Literal : type-track.Type
 	---@field value unknown
-	---@field ops type-track.Type
+	---@field of type-track.Type
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator add(type-track.Type): type-track.Union
 	local LiteralInst = muun("Literal", Type)
@@ -1349,10 +1349,10 @@ do -- Literal
 
 	---@param self type-track.Literal
 	---@param value unknown
-	---@param ops? type-track.Type
-	function Literal:new(value, ops)
+	---@param of? type-track.Type
+	function Literal:new(value, of)
 		self.value = value
-		self.ops = ops or Unknown
+		self.of = of or Unknown
 	end
 
 	---@param subset type-track.Literal
@@ -1373,24 +1373,24 @@ do -- Literal
 	---@param domain type-track.Type
 	---@return type-track.Type? range
 	function LiteralInst:eval(op, domain)
-		return self.ops:eval(op, domain)
+		return self.of:eval(op, domain)
 	end
 
 	---@param op string
 	---@return type-track.Type? domain
 	function LiteralInst:get_domain(op)
-		return self.ops:get_domain(op)
+		return self.of:get_domain(op)
 	end
 
 	---@param visited? { [type-track.Type]: true? }
 	---@return type-track.Type?
 	function LiteralInst:_normalize(visited)
-		local normalized_ops = self.ops:normalize(visited)
-		if not normalized_ops then
+		local normalized_of = self.of:normalize(visited)
+		if not normalized_of then
 			return nil
 		end
 
-		return Literal(self.value, normalized_ops)
+		return Literal(self.value, normalized_of)
 	end
 
 	---@param visited { [type-track.Type]: any }
@@ -1399,7 +1399,7 @@ do -- Literal
 		return {
 			_type = "Literal",
 			value = self.value,
-			ops = self.ops:debug_subdata(visited),
+			of = self.of:debug_subdata(visited),
 		}
 	end
 end
@@ -1654,7 +1654,7 @@ do -- Free
 		end,
 		---@param elem type-track.Literal
 		[Literal] = function(elem, free, replacement, visited)
-			elem.ops = sub_reify(elem.ops, free, replacement, visited)
+			elem.of = sub_reify(elem.of, free, replacement, visited)
 		end,
 
 		-- does nothing

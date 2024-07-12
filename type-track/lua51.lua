@@ -78,8 +78,8 @@ do
 
 	string_ref:reify(_string, _string) --> concat_call -> string_or_num -> number
 	number_ref:reify(number, number) --> concat_call -> string_or_num -> _string
-	number_lit.ops = _string
-	string_lit.ops = _string
+	number_lit.of = _string
+	string_lit.of = _string
 
 	_string.debug_name = "type[string]"
 	number.debug_name = "type[number]"
