@@ -81,7 +81,7 @@ describe 'Free', ->
 			lit = Literal 'value', var
 
 			var\reify lit, lit
-			assert.equal lit, lit.ops
+			assert.equal lit, lit.of
 			
 		it 'works for unknown', ->
 			var = Free!
