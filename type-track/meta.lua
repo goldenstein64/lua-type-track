@@ -1321,16 +1321,6 @@ do -- Literal
 		return Literal(self.value, normalized_ops)
 	end
 
-	---@param visited { [type-track.Type]: type-track.Type._debug_visit_info?, n: number }
-	---@return string
-	function LiteralInst:debug_string(visited)
-		return string.format(
-			'{ "Literal", "%s", %s }',
-			self.value,
-			self.ops:debug_substring(visited)
-		)
-	end
-
 	---@param visited { [type-track.Type]: any }
 	---@return table
 	function LiteralInst:debug_data(visited)
