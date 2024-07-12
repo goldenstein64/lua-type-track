@@ -144,9 +144,7 @@ local function is_subset(subset, superset)
 		end
 		subset = normalized
 	end
-	if not subset then
-		return false
-	end
+	---@cast subset type-track.Type
 
 	do
 		local normalized = superset:normalize()
@@ -155,6 +153,7 @@ local function is_subset(subset, superset)
 		end
 		superset = normalized
 	end
+	---@cast superset type-track.Type
 
 	if rawequal(subset, superset) then
 		return true
@@ -207,7 +206,6 @@ local function is_subset(subset, superset)
 	-- supertype comparisons
 	if super_cls == Tuple then
 		---@cast superset type-track.Tuple
-		---@cast subset type-track.Type
 		local superset_len = #superset.types
 		if superset_len == 0 then
 			return not superset.var_arg or is_subset(subset, superset.var_arg)
@@ -218,7 +216,6 @@ local function is_subset(subset, superset)
 		return false
 	elseif super_cls == Union then
 		---@cast superset type-track.Union
-		---@cast subset type-track.Type
 		if sub_cls == Operation then
 			---@cast subset type-track.Operation
 			local superset_domain = superset:get_domain(subset.op)
@@ -238,7 +235,6 @@ local function is_subset(subset, superset)
 		return is_subset_of_any(subset, superset.types)
 	elseif super_cls == Intersection then
 		---@cast superset type-track.Intersection
-		---@cast subset type-track.Type
 		return is_subset_of_all(subset, superset.types)
 	end
 
