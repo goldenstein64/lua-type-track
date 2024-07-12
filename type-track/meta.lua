@@ -272,15 +272,47 @@ end
 ---@param set1 type-track.Type
 ---@param set2 type-track.Type
 ---@return boolean
+local function is_ordered_overlapping(set1, set2)
+	local set1_cls = set1.__class
+	local set2_cls = set2.__class
+
+	if set1_cls == Operation then
+	elseif set1_cls == Tuple then
+	elseif set1_cls == Union then
+	elseif set1_cls == Intersection then
+	elseif set1_cls == Literal then
+	elseif set1_cls == GenericOperation then
+	elseif set1_cls == Free then
+	end
+
+	return true
+end
+
+---@param set1 type-track.Type
+---@param set2 type-track.Type
+---@return boolean
 local function is_overlapping(set1, set2)
 	if rawequal(set1, set2) then
+		return true
+	end
+
+	if set1 == Never or set2 == Never then
+		return false
+	end
+
+	if set1 == Unknown or set2 == Unknown then
 		return true
 	end
 
 	local set1_cls = set1.__class
 	local set2_cls = set2.__class
 
-	return true
+	if set1_cls == set2_cls then
+		return set1_cls.is_overlapping(set1, set2)
+	end
+
+	return is_ordered_overlapping(set1, set2)
+		or is_ordered_overlapping(set2, set1)
 end
 
 ---accepts a type `subset` if it is a subset of all types in `superset_list`
@@ -617,6 +649,19 @@ do -- Operation
 		return subset.op == superset.op
 			and is_subset(superset.domain, subset.domain)
 			and is_subset(subset.range, superset.range)
+	end
+
+	---@param set1 type-track.Operation
+	---@param set2 type-track.Operation
+	---@return boolean
+	function Operation.is_overlapping(set1, set2)
+		if set1.op ~= set2.op then
+			return false
+		end
+
+		-- this doesn't work with Never as the domain...
+		return not is_overlapping(set1.domain, set2.domain)
+			or is_overlapping(set1.range, set2.range)
 	end
 
 	---@param op string

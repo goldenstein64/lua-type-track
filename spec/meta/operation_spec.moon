@@ -63,6 +63,13 @@ describe 'Operation', ->
 			assert.is_true Operation.is_subset func23, func32
 			assert.is_false Operation.is_subset func32, func23
 
+	describe 'is_overlapping', ->
+		it 'rejects () -> (A) ~:~ () -> (B)', ->
+			funcA = Operation 'call', Tuple.Unit, A
+			funcB = Operation 'call', Tuple.Unit, B
+
+			assert.is_false Operation.is_overlapping funcA, funcB
+
 	describe 'get_domain', ->
 		it 'returns nil for the wrong op', ->
 			func = Operation 'call', Never, ABC
