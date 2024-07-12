@@ -65,7 +65,7 @@ do
 	local number_lit = string_of("number")
 	local string_lit = string_of("string")
 
-	number = Operation("type", Never, number_lit)
+	number = Operation("type", unit, number_lit)
 		* Operation("add", number_ref, number_ref)
 		* Operation("sub", number_ref, number_ref)
 		* Operation("mul", number_ref, number_ref)
@@ -74,7 +74,7 @@ do
 		* Operation("pow", number_ref, number_ref)
 		* concat_call
 
-	_string = Operation("type", Never, string_lit) * concat_call * stringlib_ref
+	_string = Operation("type", unit, string_lit) * concat_call * stringlib_ref
 
 	string_ref:reify(_string, _string) --> concat_call -> string_or_num -> number
 	number_ref:reify(number, number) --> concat_call -> string_or_num -> _string
@@ -90,9 +90,9 @@ do
 	local false_ref = Free()
 	falsy = Operation("truthy", Never, false_ref)
 
-	_nil = Literal(nil, Operation("type", Never, string_of("nil")) * falsy)
+	_nil = Literal(nil, Operation("type", unit, string_of("nil")) * falsy)
 
-	boolean = Operation("type", Never, string_of("boolean"))
+	boolean = Operation("type", unit, string_of("boolean"))
 	_true = Literal(true, boolean)
 	_false = Literal(false, boolean * falsy)
 	false_ref:reify(_false, _false)
@@ -102,18 +102,18 @@ do
 	_nil.debug_name = "nil"
 end
 
-local thread = Operation("type", Never, string_of("thread"))
-local userdata = Operation("type", Never, string_of("userdata"))
+local thread = Operation("type", unit, string_of("thread"))
+local userdata = Operation("type", unit, string_of("userdata"))
 thread.debug_name = "type[thread]"
 userdata.debug_name = "type[userdata]"
 
 local unknown_var = T({}, Unknown)
 
-local function_type = Operation("type", Never, string_of("function"))
+local function_type = Operation("type", unit, string_of("function"))
 function_type.debug_name = "type[function]"
 local _function = function_type * Operation("call", unknown_var, unknown_var)
 
-local _table = Operation("type", Never, string_of("table"))
+local _table = Operation("type", unit, string_of("table"))
 	* Operation("index", Unknown, Unknown)
 	* Operation("newindex", T({ Unknown, Unknown }), Never)
 	* Operation("len", Never, number)
@@ -143,7 +143,7 @@ local string_or_num_var = T({}, string_or_num)
 ---@param v type-track.Type
 ---@return type-track.Type
 local function map_of(k, v)
-	return Operation("type", Never, string_of("table"))
+	return Operation("type", unit, string_of("table"))
 		* Operation("index", k, v)
 		* Operation("newindex", T({ k, v }), Never)
 end
@@ -151,7 +151,7 @@ end
 ---@param t type-track.Type
 ---@return type-track.Type
 local function array_of(t)
-	return Operation("type", Never, string_of("table"))
+	return Operation("type", unit, string_of("table"))
 		* Operation("index", number, t)
 		* Operation("newindex", T({ number, t }), Never)
 end
@@ -160,7 +160,7 @@ end
 ---@return type-track.Type
 local function lib(tab)
 	---@type type-track.Type
-	local result = Operation("type", Never, string_of("table"))
+	local result = Operation("type", unit, string_of("table"))
 		* Operation("newindex", T({ Unknown, Unknown }), Never)
 	for k, v in pairs(tab) do
 		result = result * Operation("index", string_of(k), v)
