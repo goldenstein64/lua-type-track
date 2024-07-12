@@ -116,7 +116,7 @@ local _function = function_type * Operation("call", unknown_var, unknown_var)
 local _table = Operation("type", Never, string_of("table"))
 	* Operation("index", Unknown, Unknown)
 	* Operation("newindex", T({ Unknown, Unknown }), Never)
-	* Operation("len", Never, number)
+	* Operation("len", unit, number)
 _table.debug_name = "type[table]"
 
 ---@param params type-track.Type
