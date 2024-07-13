@@ -651,13 +651,9 @@ do -- Operation
 	---@param set2 type-track.Operation
 	---@return boolean
 	function Operation.is_overlapping(set1, set2)
-		if set1.op ~= set2.op then
-			return false
-		end
-
-		-- this doesn't work with Never as the domain...
-		return not is_overlapping(set1.domain, set2.domain)
-			or is_overlapping(set1.range, set2.range)
+		return set1.op == set2.op
+			and is_overlapping(set1.domain, set2.domain)
+			and is_overlapping(set1.range, set2.range)
 	end
 
 	---@param op string
