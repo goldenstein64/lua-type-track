@@ -523,20 +523,21 @@ do -- Type
 	function TypeInst:debug_subdata(visited)
 		local found = visited[self]
 		if not found then
-			visited[self] = true
 			if self.debug_name then
 				found = self.debug_name
+				visited[self] = found
 			else
-				found = self:debug_data(visited)
+				found = {}
+				visited[self] = found
+				self:debug_data(found, visited)
 			end
-			visited[self] = found
 		end
 		return found
 	end
 
+	---@param ref table
 	---@param visited { [type-track.Type]: any }
-	---@return table
-	function TypeInst:debug_data(visited)
+	function TypeInst:debug_data(ref, visited)
 		error("not implemented")
 	end
 
@@ -636,13 +637,13 @@ do -- Operation
 		return Operation(self.op, domain, range)
 	end
 
-	function OperationInst:debug_data(visited)
-		return {
-			_type = "Operation",
-			op = self.op,
-			domain = self.domain:debug_subdata(visited),
-			range = self.range:debug_subdata(visited),
-		}
+	---@param ref table
+	---@param visited { [type-track.Type]: any }
+	function OperationInst:debug_data(ref, visited)
+		ref._type = "Operation"
+		ref.op = self.op
+		ref.domain = self.domain:debug_subdata(visited)
+		ref.range = self.range:debug_subdata(visited)
 	end
 end
 
@@ -815,19 +816,17 @@ do -- Tuple
 		return Tuple(normalized_args, normalized_var_arg)
 	end
 
+	---@param ref table
 	---@param visited { [type-track.Type]: any }
-	---@return table
-	function TupleInst:debug_data(visited)
+	function TupleInst:debug_data(ref, visited)
 		local types_data = {}
 		for _, t in ipairs(self.types) do
 			table.insert(types_data, t:debug_subdata(visited))
 		end
 
-		return {
-			_type = "Tuple",
-			types = types_data,
-			var_arg = self.var_arg and self.var_arg:debug_subdata(visited),
-		}
+		ref._type = "Tuple"
+		ref.types = types_data
+		ref.var_arg = self.var_arg and self.var_arg:debug_subdata(visited)
 	end
 
 	-- the unit type, `()`
@@ -1037,15 +1036,18 @@ do -- Union
 		end
 	end
 
+	---@param ref table
 	---@param visited { [type-track.Type]: any }
-	---@return table
-	function UnionInst:debug_data(visited)
+	function UnionInst:debug_data(ref, visited)
 		local types_data = {}
 		for _, t in ipairs(self.types) do
-			table.insert(types_data, t:debug_subdata(visited))
+			local subdata = t:debug_subdata(visited)
+			assert(type(subdata) == "table", type(subdata))
+			table.insert(types_data, subdata)
 		end
 
-		return { _type = "Union", types = types_data }
+		ref._type = "Union"
+		ref.types = types_data
 	end
 end
 
@@ -1259,15 +1261,16 @@ do -- Intersection
 		return distribute_unions(flattened, visited)
 	end
 
+	---@param ref table
 	---@param visited { [type-track.Type]: any }
-	---@return table
-	function IntersectionInst:debug_data(visited)
+	function IntersectionInst:debug_data(ref, visited)
 		local types_data = {}
 		for _, t in ipairs(self.types) do
 			table.insert(types_data, t:debug_subdata(visited))
 		end
 
-		return { _type = "Intersection", types = types_data }
+		ref._type = "Intersection"
+		ref.types = types_data
 	end
 end
 
@@ -1320,14 +1323,12 @@ do -- Literal
 		return Literal(self.value, normalized_of)
 	end
 
+	---@param ref table
 	---@param visited { [type-track.Type]: any }
-	---@return table
-	function LiteralInst:debug_data(visited)
-		return {
-			_type = "Literal",
-			value = self.value,
-			of = self.of:debug_subdata(visited),
-		}
+	function LiteralInst:debug_data(ref, visited)
+		ref._type = "Literal"
+		ref.value = self.value
+		ref.of = self.of:debug_subdata(visited)
 	end
 end
 
@@ -1357,10 +1358,10 @@ do -- Unknown
 		return Unknown
 	end
 
+	---@param ref table
 	---@param visited { [type-track.Type]: any }
-	---@return table
-	function UnknownInst:debug_data(visited)
-		return { _type = "Unknown" }
+	function UnknownInst:debug_data(ref, visited)
+		ref._type = "Unknown"
 	end
 
 	Unknown = UnknownClass()
@@ -1393,10 +1394,10 @@ do -- Never
 		return nil
 	end
 
+	---@param ref table
 	---@param visited { [type-track.Type]: any }
-	---@return table
-	function NeverInst:debug_data(visited)
-		return { _type = "Never" }
+	function NeverInst:debug_data(ref, visited)
+		ref._type = "Never"
 	end
 
 	Never = NeverClass()
@@ -1501,15 +1502,13 @@ do -- GenericOperation
 		return Operation(self.op, self_domain, self_range)
 	end
 
+	---@param ref table
 	---@param visited { [type-track.Type]: any }
-	---@return table
-	function GenericOperationInst:debug_data(visited)
-		return {
-			_type = "GenericOperation",
-			op = self.op,
-			derive = self.derive_fn,
-			infer = self.infer_fn,
-		}
+	function GenericOperationInst:debug_data(ref, visited)
+		ref._type = "GenericOperation"
+		ref.op = self.op
+		ref.derive = self.derive_fn
+		ref.infer = self.infer_fn
 	end
 end
 
@@ -1654,13 +1653,11 @@ do -- Free
 		return self:unwrap():normalize(...)
 	end
 
+	---@param ref table
 	---@param visited { [type-track.Type]: any }
-	---@return table
-	function FreeInst:debug_data(visited)
-		return {
-			_type = "Free",
-			value = self.value and self.value:debug_subdata(visited),
-		}
+	function FreeInst:debug_data(ref, visited)
+		ref._type = "Free"
+		ref.value = self.value and self.value:debug_subdata(visited)
 	end
 end
 
