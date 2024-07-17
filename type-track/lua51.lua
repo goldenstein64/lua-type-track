@@ -28,17 +28,12 @@ local function memoize(f)
 		cache
 end
 
----modifies the type so it unifies to itself
+---modifies the type so it normalizes to itself
 ---@param t type-track.Type
 ---@return type-track.Type t
 local function axiom(t)
-	if t.__class == Free then
-		---@cast t type-track.Free
-		t.normalized = t.value
-		t.value.normalized = t.value
-	else
-		t.normalized = t
-	end
+	assert(t.__class ~= Free, "attempt to axiomatize a Free type")
+	t.normalized = t
 	return t
 end
 
