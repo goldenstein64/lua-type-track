@@ -1058,7 +1058,6 @@ do -- Union
 		local types_data = {}
 		for _, t in ipairs(self.types) do
 			local subdata = t:debug_subdata(visited)
-			assert(type(subdata) == "table", type(subdata))
 			table.insert(types_data, subdata)
 		end
 
