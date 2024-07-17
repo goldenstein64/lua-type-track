@@ -599,4 +599,13 @@ for k, t in pairs(lua51) do
 	lua51[k] = axiom(t)
 end
 
+lua51.define = {
+	string_of = string_of,
+	map_of = map_of,
+	array_of = array_of,
+	func = func,
+	gen_func = gen_func,
+	lib = lib,
+}
+
 return lua51
