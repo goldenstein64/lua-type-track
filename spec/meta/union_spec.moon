@@ -43,8 +43,9 @@ describe 'Union', ->
 		it 'works with order-1 cyclic unions', ->
 			op = Operation 'call', A, B
 
-			union = Free!
-			union.value = Union { op, op, union }
+			union_ref = Free!
+			union = Union { op, op, union_ref }
+			union_ref\reify union
 
 			expected = op
 			normalized = union\normalize!
@@ -53,11 +54,14 @@ describe 'Union', ->
 			assert.is_true is_subset normalized, expected
 
 		it 'returns nil for order-2 cyclic unions', ->
-			op = Free!
-			union = Free!
+			op_ref = Free!
+			union_ref = Free!
 
-			op.value = Operation "some", A, union
-			union.value = Union { op, B }
+			op = Operation "some", A, union_ref
+			union = op_ref + B
+
+			op_ref\reify op
+			union_ref\reify union
 
 			normalized_union = union\normalize!
 

@@ -76,8 +76,8 @@ do
 
 	_string = Operation("type", Never, string_lit) * concat_call * stringlib_ref
 
-	string_ref:reify(_string, _string) --> concat_call -> string_or_num -> number
-	number_ref:reify(number, number) --> concat_call -> string_or_num -> _string
+	string_ref:reify(_string)
+	number_ref:reify(number)
 	number_lit.of = _string
 	string_lit.of = _string
 
@@ -95,7 +95,7 @@ do
 	boolean = Operation("type", Never, string_of("boolean"))
 	_true = Literal(true, boolean)
 	_false = Literal(false, boolean * falsy)
-	false_ref:reify(_false, _false)
+	false_ref:reify(_false)
 	boolean.debug_name = "type[boolean]"
 	_true.debug_name = "true"
 	_false.debug_name = "false"
@@ -218,8 +218,7 @@ local tablelib = lib({
 	remove = func(T({ _table, num_or_nil }), Unknown),
 	sort = func(T({ _table, _function }), unit),
 })
-stringlib_ref:reify(stringlib, stringlib)
-stringlib_ref:reify(_string, stringlib)
+stringlib_ref:reify(stringlib)
 
 local num_to_num = func(number, number)
 local num_to_num2 = func(number, T({ number, number }))
@@ -332,8 +331,7 @@ local file = userdata
 		write = func(T({ file_ref }, string_or_num), file_or_fail),
 	})
 
-file_ref:reify(file, file)
-file_ref:reify(iolib, file)
+file_ref:reify(file)
 
 local osdate_table = lib({
 	year = number,
@@ -572,6 +570,8 @@ local lua51 = {
 	-- base types
 	["nil"] = _nil,
 	boolean = boolean,
+	["true"] = _true,
+	["false"] = _false,
 	number = number,
 	string = _string,
 	table = _table,

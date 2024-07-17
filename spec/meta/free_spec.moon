@@ -1,4 +1,4 @@
-import 
+import
 	Free, Type, Operation, Literal
 	Union, Intersection, Never, Unknown
 	Tuple
@@ -32,28 +32,28 @@ describe 'Free', ->
 			var = Free!
 			op = Operation 'call', var, B
 
-			var\reify op, op
+			var\reify op
 			assert.equal op, op.domain
 
 		it 'works for tuples without var arg', ->
 			var = Free!
 			tup = Tuple { var, B }
 
-			var\reify tup, tup
+			var\reify tup
 			assert.equal tup, tup.types[1]
 
 		it 'works for tuples with var arg', ->
 			var = Free!
 			tup = Tuple { A, B }, var
 
-			var\reify tup, tup
+			var\reify tup
 			assert.equal tup, tup.var_arg
 
 		it 'works for unions', ->
 			var = Free!
 			union = Union { var, B }
 
-			var\reify union, union
+			var\reify union
 			assert.equal union, union.types[1]
 
 		it 'works for 2-cycle unions', ->
@@ -63,8 +63,8 @@ describe 'Free', ->
 			union1 = Union { var2, A }
 			union2 = Union { var1, B }
 
-			var2\reify union1, union2
-			var1\reify union2, union1
+			var1\reify union1
+			var2\reify union2
 
 			assert.equal union2, union1.types[1]
 			assert.equal union1, union2.types[1]
@@ -76,38 +76,31 @@ describe 'Free', ->
 			var\reify inter, inter
 			assert.equal inter, inter.types[1]
 
+		it 'works for 2-cycle intersections', ->
+			var1 = Free!
+			var2 = Free!
+			inter1 = Intersection { var2, B }
+			inter2 = Intersection { var1, B }
+
+			var1\reify inter1
+			var2\reify inter2
+
+			assert.equal inter1, inter2.types[1]
+			assert.equal inter2, inter1.types[1]
+
 		it 'works for literals', ->
 			var = Free!
 			lit = Literal 'value', var
 
-			var\reify lit, lit
+			var\reify lit
 			assert.equal lit, lit.of
-			
+
 		it 'works for unknown', ->
 			var = Free!
-			
+
 			assert.no_error -> var\reify Unknown, Unknown
 
 		it 'works for never', ->
 			var = Free!
 
 			assert.no_error -> var\reify Never, Never
-
-		it 'works for free', ->
-			var = Free!
-			other_var = Free!
-			other_var.value = var
-
-			var\reify other_var, other_var
-			assert.equal other_var, other_var.value
-
-		it 'defaults replacement arg to self.value if nil', ->
-			var = Free!
-			op = Operation 'call', var, B
-
-			assert.error -> var\reify op
-
-			var.value = op
-			var\reify op
-
-			assert.equal op, op.domain

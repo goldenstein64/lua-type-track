@@ -66,8 +66,9 @@ describe 'Intersection', ->
 		it 'works with order-1 cyclic intersections', ->
 			op = Operation 'call', A, B
 
-			inter = Free!
-			inter.value = Intersection { op, op, inter }
+			inter_ref = Free!
+			inter = Intersection { op, op, inter_ref }
+			inter_ref\reify inter
 
 			expected = op
 
@@ -77,19 +78,17 @@ describe 'Intersection', ->
 			assert.is_true is_subset expected, normalized
 
 		it 'returns nil for order-2 cyclic intersections', ->
-			_string = Free!
-			number = Free!
+			string_ref = Free!
+			number_ref = Free!
 
-			number.value = Operation "add", number, number
-			number.value.normalized = number.value -- already normalized
+			number = Operation "add", number_ref, number_ref
+			number_ref\reify number
+			number.normalized = number -- already normalized
 
-			string_of = memoize (value) -> Literal value, _string
-			concat_call = Operation "concat", _string + number, _string
+			concat_call = Operation "concat", string_ref + number, string_ref
 
-			_string.value = Intersection {
-				Operation "type", Never, string_of "string"
-				concat_call
-			}
+			_string = concat_call * Operation "type", Never, Literal("string", string_ref)
+			string_ref\reify _string
 
 			assert.is_nil concat_call\normalize!
 			assert.is_nil _string\normalize!
@@ -131,7 +130,7 @@ describe 'Intersection', ->
 			}
 
 			assert.is_nil inter\eval 'call', C
-		
+
 		it 'returns an intersection of compatible types', ->
 			inter = Intersection {
 				Operation 'call', A, B

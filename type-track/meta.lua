@@ -159,34 +159,18 @@ local function is_subset(subset, superset)
 		return true
 	end
 
-	while true do
-		local sub_cls = subset.__class
-		if sub_cls == Free then
-			---@cast subset type-track.Free
-			subset = subset:unwrap()
-		elseif sub_cls == GenericOperation then
-			---@cast subset type-track.GenericOperation
-			local new_subset = subset:match(superset)
-			if not new_subset then
-				return false
-			end
-			subset = new_subset
-		else
-			break
+	while subset.__class == GenericOperation do
+		---@cast subset type-track.GenericOperation
+		local new_subset = subset:match(superset)
+		if not new_subset then
+			return false
 		end
+		subset = new_subset
 	end
 
-	while true do
-		local super_cls = superset.__class
-		if super_cls == Free then
-			---@cast superset type-track.Free
-			superset = superset:unwrap()
-		elseif super_cls == GenericOperation then
-			---@cast superset type-track.GenericOperation
-			superset = assert(superset.derive_fn(unknown_var))
-		else
-			break
-		end
+	while superset.__class == GenericOperation do
+		---@cast superset type-track.GenericOperation
+		superset = assert(superset.derive_fn(unknown_var))
 	end
 
 	if subset == Never or superset == Unknown then
@@ -199,6 +183,11 @@ local function is_subset(subset, superset)
 
 	local sub_cls = subset.__class
 	local super_cls = superset.__class
+	assert(
+		sub_cls ~= Free and super_cls ~= Free,
+		"attempt to compute is_subset of Free type"
+	)
+
 	if sub_cls == super_cls then
 		return sub_cls.is_subset(subset, superset)
 	end
@@ -584,6 +573,15 @@ do -- Operation
 		self.domain = domain
 		self.range = range
 		self.op = op
+
+		if domain.__class == Free then
+			---@cast domain type-track.Free
+			domain.dependencies[self] = true
+		end
+		if range.__class == Free then
+			---@cast range type-track.Free
+			range.dependencies[self] = true
+		end
 	end
 
 	---@param subset type-track.Operation
@@ -663,6 +661,17 @@ do -- Tuple
 	function Tuple:new(types, var_arg)
 		self.types = types
 		self.var_arg = var_arg
+
+		for _, type in ipairs(types) do
+			if type.__class == Free then
+				---@cast type type-track.Free
+				type.dependencies[self] = true
+			end
+		end
+		if var_arg and var_arg.__class == Free then
+			---@cast var_arg type-track.Free
+			var_arg.dependencies[self] = true
+		end
 	end
 
 	---compares two tuples
@@ -848,6 +857,13 @@ do -- Union
 		assert(#types >= 2, "unions must have at least two items")
 		self.types = types
 		-- I'll worry about optimizing this later
+
+		for _, type in ipairs(types) do
+			if type.__class == Free then
+				---@cast type type-track.Free
+				type.dependencies[self] = true
+			end
+		end
 	end
 
 	--[[
@@ -939,10 +955,10 @@ do -- Union
 	local function flatten_union(self, types, visited)
 		local result = {} ---@type type-track.Type[]
 		for _, elem in ipairs(types) do
-			if elem.__class == Free then
-				---@cast elem type-track.Free
-				elem = elem:unwrap()
-			end
+			assert(
+				elem.__class ~= Free,
+				"unbound Free type found while normalizing union"
+			)
 
 			if rawequal(elem, self) then
 				-- A | A = A, so we can skip itself
@@ -1067,6 +1083,13 @@ do -- Intersection
 		assert(#types >= 2, "intersections must have at least two items")
 		self.types = types
 		-- I'll worry about optimizing this later
+
+		for _, type in ipairs(types) do
+			if type.__class == Free then
+				---@cast type type-track.Free
+				type.dependencies[self] = true
+			end
+		end
 	end
 
 	---@param subset type-track.Intersection
@@ -1172,10 +1195,10 @@ do -- Intersection
 	local function flatten_intersection(self, types, visited)
 		local result = {} ---@type type-track.Type[]
 		for _, elem in ipairs(types) do
-			if elem.__class == Free then
-				---@cast elem type-track.Free
-				elem = elem:unwrap()
-			end
+			assert(
+				elem.__class ~= Free,
+				"unbound Free type found while normalizing intersection"
+			)
 
 			if rawequal(elem, self) then
 				-- A & A = A, so we can skip itself
@@ -1290,6 +1313,11 @@ do -- Literal
 	function Literal:new(value, of)
 		self.value = value
 		self.of = of or Unknown
+
+		if of and of.__class == Free then
+			---@cast of type-track.Free
+			of.dependencies[self] = true
+		end
 	end
 
 	---@param subset type-track.Literal
@@ -1514,150 +1542,132 @@ end
 
 do -- Free
 	---@class type-track.Free : type-track.Type
-	---@field value type-track.Type?
+	---@field dependencies { [type-track.Type]: true? }
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator add(type-track.Type): type-track.Union
 	local FreeInst = muun("Free", Type)
 
 	Free = FreeInst --[[@as type-track.Free.Class]]
 
-	---recursively reveals `Free.value` until it arrives at a concrete type
-	---@return type-track.Type
-	function FreeInst:unwrap()
-		local visited = { [self] = true } --- @type { [type-track.Type]: true? }
-		local result = self ---@type type-track.Type
-
-		while result.__class == Free do
-			---@cast result type-track.Free
-			result = assert(result.value, "attempt to use an empty Free type")
-			assert(not visited[result], "Free type is cyclic")
-			visited[result] = true
-		end
-
-		return result
+	function FreeInst:new()
+		self.dependencies = {}
 	end
 
-	---@type fun(elem: type-track.Type, free: type-track.Free, replacement: type-track.Type, visited: { [type-track.Type]: type-track.Type? }): type-track.Type
+	---@type fun(elem: type-track.Type, free: type-track.Free, replacement: type-track.Type): type-track.Type
 	local sub_reify
 
-	---@type { [any]: fun(elem: type-track.Type, free: type-track.Free, replacement: type-track.Type, visited: { [type-track.Type]: type-track.Type? }) }
+	---@param elem type-track.Type
+	---@param free type-track.Free
+	---@param replacement type-track.Type
+	---@return type-track.Type
+	local function replace_if_eq(elem, free, replacement)
+		if elem == free then
+			return replacement
+		else
+			return elem
+		end
+	end
+
+	---@type { [any]: fun(elem: type-track.Type, free: type-track.Free, replacement: type-track.Type) }
 	local reify_class_handlers = {
-		---@param elem type-track.Free
-		[Free] = function(elem, free, replacement, visited)
-			local elem_value = elem.value
-			if elem_value then
-				elem.value = sub_reify(elem_value, free, replacement, visited)
-			end
-		end,
 		---@param elem type-track.Operation
-		[Operation] = function(elem, free, replacement, visited)
-			elem.domain = sub_reify(elem.domain, free, replacement, visited)
-			elem.range = sub_reify(elem.range, free, replacement, visited)
+		[Operation] = function(elem, free, replacement)
+			elem.domain = replace_if_eq(elem.domain, free, replacement)
+			elem.range = replace_if_eq(elem.range, free, replacement)
 		end,
 		---@param elem type-track.Tuple
-		[Tuple] = function(elem, free, replacement, visited)
+		[Tuple] = function(elem, free, replacement)
 			local types = elem.types
 			for i, t in ipairs(types) do
-				types[i] = sub_reify(t, free, replacement, visited)
+				types[i] = replace_if_eq(t, free, replacement)
 			end
 			if elem.var_arg then
-				elem.var_arg = sub_reify(elem.var_arg, free, replacement, visited)
+				elem.var_arg = replace_if_eq(elem.var_arg, free, replacement)
 			end
 		end,
 		---@param elem type-track.Union
-		[Union] = function(elem, free, replacement, visited)
+		[Union] = function(elem, free, replacement)
 			local types = elem.types
 			for i, t in ipairs(types) do
-				types[i] = sub_reify(t, free, replacement, visited)
+				types[i] = replace_if_eq(t, free, replacement)
 			end
 		end,
 		---@param elem type-track.Intersection
-		[Intersection] = function(elem, free, replacement, visited)
+		[Intersection] = function(elem, free, replacement)
 			local types = elem.types
 			for i, t in ipairs(types) do
-				types[i] = sub_reify(t, free, replacement, visited)
+				types[i] = replace_if_eq(t, free, replacement)
 			end
 		end,
 		---@param elem type-track.Literal
-		[Literal] = function(elem, free, replacement, visited)
-			elem.of = sub_reify(elem.of, free, replacement, visited)
+		[Literal] = function(elem, free, replacement)
+			elem.of = replace_if_eq(elem.of, free, replacement)
 		end,
 
 		-- does nothing
+		[Free] = function() end,
 		[GenericOperation] = function() end,
 	}
 
 	---@param elem type-track.Type
 	---@param free type-track.Free
 	---@param replacement type-track.Type
-	---@param visited { [type-track.Type]: type-track.Type? }
 	---@return type-track.Type
-	function sub_reify(elem, free, replacement, visited)
+	function sub_reify(elem, free, replacement)
 		assert(elem ~= nil, "elem is nil")
-		local found = visited[elem]
-		if found then
-			return found
-		end
 
 		if elem == free then
-			visited[elem] = replacement
 			return replacement
-		else
-			visited[elem] = elem
-			if elem ~= Unknown and elem ~= Never then
-				local handler = assert(
-					reify_class_handlers[elem.__class],
-					"unhandled type in redefine"
-				)
-				if handler then
-					handler(elem, free, replacement, visited)
-				end
+		elseif elem ~= Unknown and elem ~= Never then
+			local handler =
+				assert(reify_class_handlers[elem.__class], "unhandled type in redefine")
+			if handler then
+				handler(elem, free, replacement)
 			end
 		end
 
 		return elem
 	end
 
-	---modifies `value` in place such that any instance of `self` is replaced with
-	---`replacement`. `replacement` defaults to `self.value`, in which case
-	---`self.value` must be non-empty.
-	---@param value type-track.Type
-	---@param replacement type-track.Type?
-	function FreeInst:reify(value, replacement)
-		replacement = replacement
-			or assert(self.value, "attempt to use an empty Free type")
-		sub_reify(value, self, replacement, { [self] = replacement })
+	---modifies all types that depend on this instance such that any instance of
+	---`self` is replaced with `replacement`.
+	---@param replacement type-track.Type
+	function FreeInst:reify(replacement)
+		for dep in pairs(self.dependencies) do
+			sub_reify(dep, self, replacement)
+		end
 	end
 
 	---@return type-track.Type? range
-	function FreeInst:eval(...)
-		return self:unwrap():eval(...)
+	function FreeInst:eval()
+		error("unsupported method Free:eval()")
+	end
+
+	---@return type-track.Type? domain
+	function FreeInst:get_domain()
+		error("unsupported method Free:get_domain()")
 	end
 
 	---@return type-track.Type?
-	function FreeInst:get_domain(...)
-		return self:unwrap():get_domain(...)
+	function FreeInst:at()
+		error("unsupported method Free:at()")
 	end
 
-	---@return type-track.Type?
-	function FreeInst:at(...)
-		return self:unwrap():at(...)
-	end
-
-	---@return type-track.Type?
-	function FreeInst:normalize(...)
-		if self.normalized then
-			return self.normalized
-		end
-
-		return self:unwrap():normalize(...)
+	---@return type-track.Type? normalized
+	function FreeInst:normalize()
+		error("unsupported method Free:normalize()")
 	end
 
 	---@param ref table
 	---@param visited { [type-track.Type]: any }
 	function FreeInst:debug_data(ref, visited)
+		local deps_data = {}
+		for dep in pairs(self.dependencies) do
+			table.insert(deps_data, dep:debug_subdata(visited))
+		end
+
 		ref._type = "Free"
-		ref.value = self.value and self.value:debug_subdata(visited)
+		ref.dependencies = deps_data
 	end
 end
 
