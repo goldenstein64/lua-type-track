@@ -944,10 +944,10 @@ do -- Union
 		local all_ranges = {}
 
 		-- if any element doesn't support it, the entire union doesn't support it
-		for _, type in ipairs(self.types) do
+		for i, type in ipairs(self.types) do
 			local range = type:eval(op, domain)
 			if range then
-				table.insert(all_ranges, range)
+				all_ranges[i] = range
 			else
 				return nil
 			end
@@ -962,10 +962,10 @@ do -- Union
 	function UnionInst:get_domain(op)
 		---@type type-track.Type[]
 		local all_domains = {}
-		for _, type in ipairs(self.types) do
+		for i, type in ipairs(self.types) do
 			local domain = type:get_domain(op)
 			if domain then
-				table.insert(all_domains, domain)
+				all_domains[i] = domain
 			else
 				return nil
 			end
