@@ -24,9 +24,11 @@ describe 'Free', ->
 			assert.error -> free\unwrap!
 
 	describe 'reify', ->
-		A = Literal 'A'
-		B = Literal 'B'
-		C = Literal 'C'
+		local A, B, C
+		lazy_setup ->
+			A = Literal 'A'
+			B = Literal 'B'
+			C = Literal 'C'
 
 		it 'works for operations', ->
 			var = Free!

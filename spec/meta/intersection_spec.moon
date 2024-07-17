@@ -15,9 +15,11 @@ memoize = (f) ->
 		r
 
 describe 'Intersection', ->
-	A = Literal 'A'
-	B = Literal 'B'
-	C = Literal 'C'
+	local A, B, C
+	lazy_setup ->
+		A = Literal 'A'
+		B = Literal 'B'
+		C = Literal 'C'
 
 	it 'is a type', ->
 		inter = Intersection { A, B }

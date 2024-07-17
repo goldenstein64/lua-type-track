@@ -7,13 +7,14 @@ from require 'type-track.meta'
 
 
 describe 'is_subset', ->
-	unit = Tuple {}
-	unknown_var = Tuple {}, Unknown
+	local unknown_var, A, B, C, D
+	lazy_setup ->
+		unknown_var = Tuple {}, Unknown
 
-	A = Literal 'A'
-	B = Literal 'B'
-	C = Literal 'C'
-	D = Literal 'D'
+		A = Literal 'A'
+		B = Literal 'B'
+		C = Literal 'C'
+		D = Literal 'D'
 
 	it 'accepts A <: A | B', ->
 		assert.is_true is_subset A, A + B
@@ -53,13 +54,13 @@ describe 'is_subset', ->
 		assert.is_true is_subset ab_type, x_type
 
 	it 'accepts { call: A -> () } <: { call(T): T -> () }', ->
-		type1 = Operation 'call', A, unit
+		type1 = Operation 'call', A, Tuple.Unit
 		type2 = GenericOperation(
 			'call'
 			(T) ->
 				return nil if not T
 
-				T, unit
+				T, Tuple.Unit
 
 			(domain) -> domain\at 1
 		)
@@ -67,13 +68,13 @@ describe 'is_subset', ->
 		assert.is_true is_subset type1, type2
 
 	it 'accepts { call(T): () -> T } <: { call: () -> A }', ->
-		type1 = Operation 'call', unit, A
+		type1 = Operation 'call', Tuple.Unit, A
 		type2 = GenericOperation(
 			'call'
 			(T) ->
 				return nil if not T
 
-				unit, T
+				Tuple.Unit, T
 
 			(domain, range) -> range\at 1
 		)

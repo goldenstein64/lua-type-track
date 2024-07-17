@@ -1,6 +1,6 @@
 import
 	is_subset
-	Type, Tuple, Literal, Unknown, Never 
+	Type, Tuple, Literal, Unknown, Never
 from require 'type-track.meta'
 
 is_equiv = (a, b) -> (is_subset a, b) and (is_subset b, a)
@@ -10,11 +10,13 @@ describe 'Tuple', ->
 		tup = Tuple {}
 		assert.is_true tup\is_instance Type
 
-	-- local A, B, C = "A", "B", "C"
-	A = Literal 'A'
-	B = Literal 'B'
-	C = Literal 'C'
-	Nil = Literal nil
+	local A, B, C, Nil
+	lazy_setup ->
+		-- local A, B, C = "A", "B", "C"
+		A = Literal 'A'
+		B = Literal 'B'
+		C = Literal 'C'
+		Nil = Literal nil
 
 	describe 'is_subset', ->
 		it 'accepts shorter tuples but not converse', ->
@@ -152,4 +154,3 @@ describe 'Tuple', ->
 			expected_var = B + C
 			assert.equal "A", tup\at(1).value
 			assert.is_true is_equiv expected_var, normalized_var
-			

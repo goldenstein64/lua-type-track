@@ -5,9 +5,11 @@ import
 from require 'type-track.meta'
 
 describe 'Union', ->
-	A = Literal 'A'
-	B = Literal 'B'
-	C = Literal 'C'
+	local A, B, C
+	lazy_setup ->
+		A = Literal 'A'
+		B = Literal 'B'
+		C = Literal 'C'
 
 	it 'is a Type', ->
 		union = Union { A, B }
