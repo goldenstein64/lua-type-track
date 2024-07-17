@@ -113,6 +113,12 @@ local all_are_subset
 ---@type fun(subset_list: type-track.Type[], superset: type-track.Type, i?: integer, j?: integer): boolean
 local any_are_subset
 
+---@type fun(subset_list: type-track.Type[], superset: type-track.Type, i?: integer, j?: integer): boolean
+local any_overlap_with
+
+---@type fun(subset_list: type-track.Type[], superset: type-track.Type, i?: integer, j?: integer): boolean
+local all_overlap_with
+
 ---determines whether `subset` is a subset of `superset`
 ---
 ---It is essentially a test to see if this assignment passes:
@@ -377,6 +383,38 @@ function any_are_subset(subset_list, superset, i, j)
 	end
 
 	return false
+end
+
+---@param set1 type-track.Type
+---@param set2_list type-track.Type[]
+---@param i? integer
+---@param j? integer
+---@return boolean
+function any_overlap_with(set1, set2_list, i, j)
+	for k = i or 1, j or #set2_list do
+		local set2 = set2_list[k]
+		if is_overlapping(set1, set2) then
+			return true
+		end
+	end
+
+	return false
+end
+
+---@param set1 type-track.Type
+---@param set2_list type-track.Type[]
+---@param i? integer
+---@param j? integer
+---@return boolean
+function all_overlap_with(set1, set2_list, i, j)
+	for k = i or 1, j or #set2_list do
+		local set2 = set2_list[k]
+		if not is_overlapping(set1, set2) then
+			return false
+		end
+	end
+
+	return true
 end
 
 do -- Type
