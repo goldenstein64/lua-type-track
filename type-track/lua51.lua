@@ -28,17 +28,12 @@ local function memoize(f)
 		cache
 end
 
----modifies the type so it unifies to itself
+---modifies the type so it normalizes to itself
 ---@param t type-track.Type
 ---@return type-track.Type t
 local function axiom(t)
-	if t.__class == Free then
-		---@cast t type-track.Free
-		t.normalized = t.value
-		t.value.normalized = t.value
-	else
-		t.normalized = t
-	end
+	assert(t.__class ~= Free, "attempt to axiomatize a Free type")
+	t.normalized = t
 	return t
 end
 
@@ -76,8 +71,8 @@ do
 
 	_string = Operation("type", unit, string_lit) * concat_call * stringlib_ref
 
-	string_ref:reify(_string, _string) --> concat_call -> string_or_num -> number
-	number_ref:reify(number, number) --> concat_call -> string_or_num -> _string
+	string_ref:reify(_string)
+	number_ref:reify(number)
 	number_lit.of = _string
 	string_lit.of = _string
 
@@ -95,7 +90,7 @@ do
 	boolean = Operation("type", unit, string_of("boolean"))
 	_true = Literal(true, boolean)
 	_false = Literal(false, boolean * falsy)
-	false_ref:reify(_false, _false)
+	false_ref:reify(_false)
 	boolean.debug_name = "type[boolean]"
 	_true.debug_name = "true"
 	_false.debug_name = "false"
@@ -116,7 +111,7 @@ local _function = function_type * Operation("call", unknown_var, unknown_var)
 local _table = Operation("type", unit, string_of("table"))
 	* Operation("index", Unknown, Unknown)
 	* Operation("newindex", T({ Unknown, Unknown }), Never)
-	* Operation("len", Never, number)
+	* Operation("len", unit, number)
 _table.debug_name = "type[table]"
 
 ---@param params type-track.Type
@@ -218,8 +213,7 @@ local tablelib = lib({
 	remove = func(T({ _table, num_or_nil }), Unknown),
 	sort = func(T({ _table, _function }), unit),
 })
-stringlib_ref:reify(stringlib, stringlib)
-stringlib_ref:reify(_string, stringlib)
+stringlib_ref:reify(stringlib)
 
 local num_to_num = func(number, number)
 local num_to_num2 = func(number, T({ number, number }))
@@ -332,8 +326,7 @@ local file = userdata
 		write = func(T({ file_ref }, string_or_num), file_or_fail),
 	})
 
-file_ref:reify(file, file)
-file_ref:reify(iolib, file)
+file_ref:reify(file)
 
 local osdate_table = lib({
 	year = number,
@@ -572,6 +565,8 @@ local lua51 = {
 	-- base types
 	["nil"] = _nil,
 	boolean = boolean,
+	["true"] = _true,
+	["false"] = _false,
 	number = number,
 	string = _string,
 	table = _table,
@@ -603,5 +598,14 @@ local lua51 = {
 for k, t in pairs(lua51) do
 	lua51[k] = axiom(t)
 end
+
+lua51.define = {
+	string_of = string_of,
+	map_of = map_of,
+	array_of = array_of,
+	func = func,
+	gen_func = gen_func,
+	lib = lib,
+}
 
 return lua51
