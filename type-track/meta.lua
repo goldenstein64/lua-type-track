@@ -840,6 +840,7 @@ do -- Tuple
 
 	-- the unit type, `()`
 	Tuple.Unit = Tuple({})
+	Tuple.Unit.debug_name = "Tuple.Unit"
 end
 
 do -- Union
