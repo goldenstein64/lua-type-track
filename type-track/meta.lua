@@ -685,13 +685,15 @@ do -- Operation
 			and is_subset(subset.range, superset.range)
 	end
 
+	---given two operations `T1 = (A) -> (U)` and `T2 = (B) -> (V)`, it is possible
+	---to have an overlap if:
+	---- `T1.op ~= T2.op`, in which case the overlap is simply `T1 & T2`, or
+	---- `U` overlaps `V`, in which case the overlap is `(A | B) -> (U & V)`
 	---@param set1 type-track.Operation
 	---@param set2 type-track.Operation
 	---@return boolean
 	function Operation.is_overlapping(set1, set2)
-		return set1.op == set2.op
-			and is_overlapping(set1.domain, set2.domain)
-			and is_overlapping(set1.range, set2.range)
+		return set1.op ~= set2.op or is_overlapping(set1.range, set2.range)
 	end
 
 	---@param op string

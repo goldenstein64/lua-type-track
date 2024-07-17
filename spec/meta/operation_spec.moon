@@ -76,11 +76,11 @@ describe 'Operation', ->
 
 			assert.is_true Operation.is_overlapping funcA1, funcA2
 
-		it 'rejects (A) -> () ~:~ (B) -> ()', ->
+		it 'accepts (A) -> () ~:~ (B) -> ()', ->
 			funcA = Operation 'call', A, Tuple.Unit
 			funcB = Operation 'call', B, Tuple.Unit
 
-			assert.is_false Operation.is_overlapping funcA, funcB
+			assert.is_true Operation.is_overlapping funcA, funcB
 
 		it 'rejects () -> (A) ~:~ () -> (B)', ->
 			funcA = Operation 'call', Tuple.Unit, A
@@ -93,6 +93,12 @@ describe 'Operation', ->
 			funcAB = Operation 'call', A, B
 
 			assert.is_false Operation.is_overlapping funcBA, funcAB
+
+		it 'always accepts different operators', ->
+			funcBA = Operation 'call', B, A
+			funcAB = Operation 'index', A, B
+
+			assert.is_true Operation.is_overlapping funcBA, funcAB
 
 	describe 'get_domain', ->
 		it 'returns nil for the wrong op', ->
