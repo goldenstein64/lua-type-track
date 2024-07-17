@@ -13,7 +13,7 @@ describe 'Operation', ->
 	assert.is_true is_subset ABC, AB
 
 	it 'is a Type', ->
-		func = Operation Never, Never
+		func = Operation 'call', Never, Never
 
 		assert.is_true func\is_instance Type
 
