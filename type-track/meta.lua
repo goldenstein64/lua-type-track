@@ -696,7 +696,9 @@ do -- Operation
 	---@param set2 type-track.Operation
 	---@return boolean
 	function Operation.is_overlapping(set1, set2)
-		return set1.op ~= set2.op or is_overlapping(set1.range, set2.range)
+		return set1.op ~= set2.op
+			or is_overlapping(set1.range, set2.range)
+			or not is_overlapping(set1.domain, set2.domain)
 	end
 
 	---@param op string

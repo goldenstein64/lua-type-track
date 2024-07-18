@@ -4,11 +4,12 @@ import
 from require 'type-track.meta'
 
 describe 'Operation', ->
-	local A, B, C, AB, ABC
+	local A, B, C, D, AB, ABC
 	lazy_setup ->
 		A = Literal 'A'
 		B = Literal 'B'
 		C = Literal 'C'
+		D = Literal 'D'
 
 		AB = Tuple { A, B }
 		ABC = Tuple { A, B, C }
@@ -91,13 +92,25 @@ describe 'Operation', ->
 
 			assert.is_false Operation.is_overlapping funcA, funcB
 
-		it 'rejects (B) -> (A) ~:~ (A) -> (B)', ->
+		it 'accepts (B) -> (A) ~:~ (A) -> (B)', ->
 			funcBA = Operation 'call', B, A
 			funcAB = Operation 'call', A, B
 
-			assert.is_false Operation.is_overlapping funcBA, funcAB
+			assert.is_true Operation.is_overlapping funcBA, funcAB
 
-		it 'always accepts different operators', ->
+		it 'rejects overlapping domain and disjoint range', ->
+			funcABA = Operation 'call', A + B, A
+			funcBCB = Operation 'call', B + C, B
+
+			assert.is_false Operation.is_overlapping funcABA, funcBCB
+
+		it 'accepts disjoint domain and disjoint range', ->
+			funcAB = Operation 'call', A, B
+			funcCD = Operation 'call', C, D
+
+			assert.is_true Operation.is_overlapping funcAB, funcCD
+
+		it 'accepts different operators', ->
 			funcBA = Operation 'call', B, A
 			funcAB = Operation 'index', A, B
 
