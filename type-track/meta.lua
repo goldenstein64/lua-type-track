@@ -1689,4 +1689,10 @@ meta.Type = Type
 
 meta.is_subset = is_subset
 
+---@param t unknown
+---@return boolean
+function meta.is_type(t)
+	return Inheritable.is_instance(t, Type)
+end
+
 return meta
