@@ -11,11 +11,15 @@ describe 'Tuple', ->
 		assert.is_true tup\is_instance Type
 
 	local A, B, C, Nil
+	local D, E, F
 	lazy_setup ->
 		-- local A, B, C = "A", "B", "C"
 		A = Literal 'A'
 		B = Literal 'B'
 		C = Literal 'C'
+		D = Literal 'D'
+		E = Literal 'E'
+		F = Literal 'F'
 		Nil = Literal nil
 
 	describe 'is_subset', ->
@@ -78,6 +82,37 @@ describe 'Tuple', ->
 			short_tup = Tuple { A }, A
 
 			assert.is_false Tuple.is_subset long_tup, short_tup
+
+	describe 'is_overlapping', ->
+		it 'accepts tuples where each element overlaps', ->
+			tup1 = Tuple { A + B, D + E }
+			tup2 = Tuple { B + C, E + F }
+
+			assert.is_true Tuple.is_overlapping tup1, tup2
+
+		it 'rejects tuples where one element is disjoint', ->
+			tup1 = Tuple { A, B }
+			tup2 = Tuple { A, C }
+
+			assert.is_false Tuple.is_overlapping tup1, tup2
+
+		it 'accepts different length tuples', ->
+			tup1 = Tuple { A, B }
+			tup2 = Tuple { A, B, C }
+
+			assert.is_true Tuple.is_overlapping tup1, tup2
+
+		it 'accepts tuples where shorter has overlapping vars', ->
+			tup1 = Tuple { A, B }, C
+			tup2 = Tuple { A, B, C + E, C + D }
+
+			assert.is_true Tuple.is_overlapping tup1, tup2
+
+		it 'rejects tuples where shorter has disjoint vars', ->
+			tup1 = Tuple { A, B }, C
+			tup2 = Tuple { A, B, C, D }
+
+			assert.is_false Tuple.is_overlapping tup1, tup2
 
 	describe 'at', ->
 		it 'returns its types by index', ->

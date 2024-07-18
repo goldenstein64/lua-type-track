@@ -289,6 +289,24 @@ local function is_overlapping(set1, set2)
 		return true
 	end
 
+	do
+		local normalized = set1:normalize()
+		if not normalized then
+			return true
+		end
+		set1 = normalized
+	end
+	---@cast set1 type-track.Type
+
+	do
+		local normalized = set2:normalize()
+		if not normalized then
+			return true
+		end
+		set2 = normalized
+	end
+	---@cast set2 type-track.Type
+
 	if set1 == Never or set2 == Never then
 		return false
 	end
@@ -842,6 +860,40 @@ do -- Tuple
 		return true
 	end
 
+	---@param set1 type-track.Tuple
+	---@param set2 type-track.Tuple
+	---@return boolean
+	function Tuple.is_overlapping(set1, set2)
+		local short_set, long_set
+		if #set1.elements < #set2.elements then
+			short_set, long_set = set1, set2
+		else
+			short_set, long_set = set2, set1
+		end
+		local short_elems = short_set.elements
+		local long_elems = long_set.elements
+
+		for i = 1, #short_elems do
+			local short_t = short_elems[i]
+			local long_t = long_elems[i]
+			if not is_overlapping(short_t, long_t) then
+				return false
+			end
+		end
+
+		local short_var = short_set.var
+		if short_var then
+			for i = #short_elems + 1, #long_elems do
+				local long_t = long_elems[i]
+				if not is_overlapping(short_var, long_t) then
+					return false
+				end
+			end
+		end
+
+		return true
+	end
+
 	---@param i integer
 	---@return type-track.Type?
 	function TupleInst:at(i)
@@ -996,6 +1048,19 @@ do -- Union
 		end
 
 		return true
+	end
+
+	---@param set1 type-track.Union
+	---@param set2 type-track.Union
+	---@return boolean
+	function Union.is_overlapping(set1, set2)
+		for _, set1_type in ipairs(set1.types) do
+			if any_overlap_with(set1_type, set2.types) then
+				return true
+			end
+		end
+
+		return false
 	end
 
 	---@param op string
@@ -1206,6 +1271,19 @@ do -- Intersection
 	function Intersection.is_subset(subset, superset)
 		for _, supertype in ipairs(superset.types) do
 			if not is_subset_of_any(supertype, subset.types) then
+				return false
+			end
+		end
+
+		return true
+	end
+
+	---@param set1 type-track.Intersection
+	---@param set2 type-track.Intersection
+	---@return boolean
+	function Intersection.is_overlapping(set1, set2)
+		for _, set1_type in ipairs(set1.types) do
+			if not all_overlap_with(set1_type, set2.types) then
 				return false
 			end
 		end
@@ -1799,6 +1877,7 @@ meta.Free = Free
 meta.Type = Type
 
 meta.is_subset = is_subset
+meta.is_overlapping = is_overlapping
 
 ---@param t unknown
 ---@return boolean
