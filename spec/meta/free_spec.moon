@@ -42,14 +42,14 @@ describe 'Free', ->
 			tup = Tuple { var, B }
 
 			var\reify tup
-			assert.equal tup, tup.types[1]
+			assert.equal tup, tup.elements[1]
 
 		it 'works for tuples with var arg', ->
 			var = Free!
 			tup = Tuple { A, B }, var
 
 			var\reify tup
-			assert.equal tup, tup.var_arg
+			assert.equal tup, tup.var
 
 		it 'works for unions', ->
 			var = Free!

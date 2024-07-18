@@ -38,11 +38,11 @@ do
 		end,
 		---@param elem type-track.Tuple
 		[Tuple] = function(elem)
-			for _, t in ipairs(elem.types) do
+			for _, t in ipairs(elem.elements) do
 				axiom(t)
 			end
-			if elem.var_arg then
-				axiom(elem.var_arg)
+			if elem.var then
+				axiom(elem.var)
 			end
 		end,
 		---@param elem type-track.Union
