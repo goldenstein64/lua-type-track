@@ -113,6 +113,8 @@ local all_are_subset
 ---@type fun(subset_list: type-track.Type[], superset: type-track.Type, i?: integer, j?: integer): boolean
 local any_are_subset
 
+--#region is_subset
+
 ---determines whether `subset` is a subset of `superset`
 ---
 ---It is essentially a test to see if this assignment passes:
@@ -321,6 +323,8 @@ function any_are_subset(subset_list, superset, i, j)
 
 	return false
 end
+
+--#endregion
 
 do -- Type
 	---@class type-track.Type : Inheritable
