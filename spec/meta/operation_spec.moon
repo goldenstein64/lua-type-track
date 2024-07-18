@@ -4,13 +4,16 @@ import
 from require 'type-track.meta'
 
 describe 'Operation', ->
-	A = Literal 'A'
-	B = Literal 'B'
-	C = Literal 'C'
+	local A, B, C, AB, ABC
+	lazy_setup ->
+		A = Literal 'A'
+		B = Literal 'B'
+		C = Literal 'C'
 
-	AB = Tuple { A, B }
-	ABC = Tuple { A, B, C }
-	assert.is_true is_subset ABC, AB
+		AB = Tuple { A, B }
+		ABC = Tuple { A, B, C }
+
+		assert.is_true is_subset ABC, AB
 
 	it 'is a Type', ->
 		func = Operation 'call', Never, Never

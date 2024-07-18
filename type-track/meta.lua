@@ -8,7 +8,7 @@ local permute = require("type-track.permute")
 ---a multi-value type. Importantly, it describes how arguments and return
 ---values are structured.
 ---@class type-track.Tuple.Class
----@overload fun(types: type-track.Type[], var_arg?: type-track.Type): type-track.Tuple
+---@overload fun(elements: type-track.Type[], var?: type-track.Type): type-track.Tuple
 local Tuple
 
 ---the base structural type
@@ -119,6 +119,8 @@ local any_overlap_with
 ---@type fun(subset_list: type-track.Type[], superset: type-track.Type, i?: integer, j?: integer): boolean
 local all_overlap_with
 
+--#region is_subset
+
 ---determines whether `subset` is a subset of `superset`
 ---
 ---It is essentially a test to see if this assignment passes:
@@ -201,11 +203,11 @@ local function is_subset(subset, superset)
 	-- supertype comparisons
 	if super_cls == Tuple then
 		---@cast superset type-track.Tuple
-		local superset_len = #superset.types
+		local superset_len = #superset.elements
 		if superset_len == 0 then
-			return not superset.var_arg or is_subset(subset, superset.var_arg)
+			return not superset.var or is_subset(subset, superset.var)
 		elseif superset_len == 1 then
-			return is_subset(subset, superset.types[1])
+			return is_subset(subset, superset.elements[1])
 		end
 
 		return false
@@ -405,6 +407,8 @@ function all_overlap_with(set1, set2_list, i, j)
 
 	return true
 end
+
+--#endregion
 
 do -- Type
 	---@class type-track.Type : Inheritable
@@ -749,8 +753,8 @@ end
 
 do -- Tuple
 	---@class type-track.Tuple : type-track.Type
-	---@field types type-track.Type[]
-	---@field var_arg type-track.Type?
+	---@field elements type-track.Type[]
+	---@field var type-track.Type?
 	---@operator mul(type-track.Type): type-track.Intersection
 	---@operator add(type-track.Type): type-track.Union
 	local TupleInst = muun("Tuple", Type)
@@ -758,21 +762,21 @@ do -- Tuple
 	Tuple = TupleInst --[[@as type-track.Tuple.Class]]
 
 	---@param self type-track.Tuple
-	---@param types type-track.Type[]
-	---@param var_arg? type-track.Type
-	function Tuple:new(types, var_arg)
-		self.types = types
-		self.var_arg = var_arg
+	---@param elements type-track.Type[]
+	---@param var? type-track.Type
+	function Tuple:new(elements, var)
+		self.elements = elements
+		self.var = var
 
-		for _, type in ipairs(types) do
+		for _, type in ipairs(elements) do
 			if type.__class == Free then
 				---@cast type type-track.Free
 				type.dependencies[self] = true
 			end
 		end
-		if var_arg and var_arg.__class == Free then
-			---@cast var_arg type-track.Free
-			var_arg.dependencies[self] = true
+		if var and var.__class == Free then
+			---@cast var type-track.Free
+			var.dependencies[self] = true
 		end
 	end
 
@@ -789,23 +793,23 @@ do -- Tuple
 	---@return boolean
 	function Tuple.is_subset(subset, superset)
 		-- Subsets are always of equal or longer length than supersets.
-		-- `var_arg` is not counted because there may be 0 args supplied in that
+		-- `var` is not counted because there may be 0 args supplied in that
 		-- portion.
 		-- (T, T) </: (T, T, T)
 		-- (T, T, ...T) </: (T, T, T, ...T)
 		-- (T, T, ...T) </: (T, T, T)
 		-- (T, T) </: (T, T, T, ...T)
-		if #subset.types < #superset.types then
+		if #subset.elements < #superset.elements then
 			return false
 		end
 
-		local sub_var_arg = subset.var_arg or Never
-		local super_var_arg = superset.var_arg or Unknown
+		local sub_var = subset.var or Never
+		local super_var = superset.var or Unknown
 
 		-- A </: B => (...A) </: (...B)
 		-- A </: B => (B, ...A) </: (...B)
 		-- (A, ...T) <: (A)
-		if not is_subset(sub_var_arg, super_var_arg) then
+		if not is_subset(sub_var, super_var) then
 			return false
 		end
 
@@ -815,20 +819,20 @@ do -- Tuple
 		-- (A, A, A) <: (B, B)
 		-- (A, A, A) <: (B, B, ...B)
 		-- (B, B) </: (A, A)
-		for i, super_type in ipairs(superset.types) do
-			local sub_type = subset.types[i]
+		for i, super_type in ipairs(superset.elements) do
+			local sub_type = subset.elements[i]
 			if not is_subset(sub_type, super_type) then
 				return false
 			end
 		end
 
-		-- compare var_args
+		-- compare vars
 		-- given A <: B and B </: A
 		-- (A) <: (...B)
 		-- (B) </: (...A)
-		for i = #superset.types + 1, #subset.types do
-			local sub_type = subset.types[i]
-			if not is_subset(sub_type, super_var_arg) then
+		for i = #superset.elements + 1, #subset.elements do
+			local sub_type = subset.elements[i]
+			if not is_subset(sub_type, super_var) then
 				return false
 			end
 		end
@@ -839,7 +843,7 @@ do -- Tuple
 	---@param i integer
 	---@return type-track.Type?
 	function TupleInst:at(i)
-		return self.types[i] or self.var_arg
+		return self.elements[i] or self.var
 	end
 
 	---@param op string
@@ -868,29 +872,29 @@ do -- Tuple
 	---@param visited { [type-track.Type]: true? }
 	---@return type-track.Type?
 	function TupleInst:_normalize(visited)
-		local arg_count = #self.types
+		local arg_count = #self.elements
 		local has_args = arg_count > 0
-		local self_var_arg = self.var_arg
-		local normalized_var_arg = nil ---@type type-track.Type?
-		if self_var_arg then
-			normalized_var_arg = self_var_arg:normalize(visited)
-			if not normalized_var_arg then
+		local self_var = self.var
+		local normalized_var = nil ---@type type-track.Type?
+		if self_var then
+			normalized_var = self_var:normalize(visited)
+			if not normalized_var then
 				return nil
 			end
 		else
 			-- 0 values is NOT the same as Never
 			-- but a unit tuple unifies to `Tuple.Unit`
-			if arg_count == 0 and not self_var_arg then
+			if arg_count == 0 and not self_var then
 				return Tuple.Unit
 			elseif arg_count == 1 then
-				return self.types[1]:normalize(visited)
+				return self.elements[1]:normalize(visited)
 			end
 		end
 
 		local normalized_args = {} ---@type type-track.Type[]
 		if has_args then
 			for i = 1, arg_count - 1 do
-				local elem = self.types[i]
+				local elem = self.elements[i]
 				local normalized = elem:normalize(visited)
 				if not normalized then
 					return nil
@@ -899,7 +903,7 @@ do -- Tuple
 				normalized_args[i] = normalized:at(1)
 			end
 
-			local last_elem = self.types[arg_count]
+			local last_elem = self.elements[arg_count]
 			local last_normalized = last_elem:normalize(visited)
 			if not last_normalized then
 				return nil
@@ -907,16 +911,16 @@ do -- Tuple
 
 			if last_normalized.__class == Tuple then
 				---@cast last_normalized type-track.Tuple
-				local last_var_arg = last_normalized.var_arg
-				if self_var_arg and last_var_arg then
-					if not is_subset(last_var_arg, self_var_arg) then
+				local last_var = last_normalized.var
+				if self_var and last_var then
+					if not is_subset(last_var, self_var) then
 						return nil
 					end
-				elseif last_var_arg then
-					normalized_var_arg = last_var_arg
+				elseif last_var then
+					normalized_var = last_var
 				end
 
-				for _, sub_elem in ipairs(last_normalized.types) do
+				for _, sub_elem in ipairs(last_normalized.elements) do
 					table.insert(normalized_args, sub_elem)
 				end
 			else
@@ -924,24 +928,25 @@ do -- Tuple
 			end
 		end
 
-		return Tuple(normalized_args, normalized_var_arg)
+		return Tuple(normalized_args, normalized_var)
 	end
 
 	---@param ref table
 	---@param visited { [type-track.Type]: any }
 	function TupleInst:debug_data(ref, visited)
-		local types_data = {}
-		for _, t in ipairs(self.types) do
-			table.insert(types_data, t:debug_subdata(visited))
+		local elements_data = {}
+		for _, t in ipairs(self.elements) do
+			table.insert(elements_data, t:debug_subdata(visited))
 		end
 
 		ref._type = "Tuple"
-		ref.types = types_data
-		ref.var_arg = self.var_arg and self.var_arg:debug_subdata(visited)
+		ref.elements = elements_data
+		ref.var = self.var and self.var:debug_subdata(visited)
 	end
 
 	-- the unit type, `()`
 	Tuple.Unit = Tuple({})
+	Tuple.Unit.debug_name = "()"
 end
 
 do -- Union
@@ -1160,7 +1165,6 @@ do -- Union
 		local types_data = {}
 		for _, t in ipairs(self.types) do
 			local subdata = t:debug_subdata(visited)
-			assert(type(subdata) == "table", type(subdata))
 			table.insert(types_data, subdata)
 		end
 
@@ -1686,12 +1690,12 @@ do -- Free
 		end,
 		---@param elem type-track.Tuple
 		[Tuple] = function(elem, free, replacement)
-			local types = elem.types
-			for i, t in ipairs(types) do
-				types[i] = replace_if_eq(t, free, replacement)
+			local elements = elem.elements
+			for i, t in ipairs(elements) do
+				elements[i] = replace_if_eq(t, free, replacement)
 			end
-			if elem.var_arg then
-				elem.var_arg = replace_if_eq(elem.var_arg, free, replacement)
+			if elem.var then
+				elem.var = replace_if_eq(elem.var, free, replacement)
 			end
 		end,
 		---@param elem type-track.Union
@@ -1793,5 +1797,11 @@ meta.Free = Free
 meta.Type = Type
 
 meta.is_subset = is_subset
+
+---@param t unknown
+---@return boolean
+function meta.is_type(t)
+	return Inheritable.is_instance(t, Type)
+end
 
 return meta

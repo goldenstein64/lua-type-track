@@ -1,8 +1,9 @@
 import Type, Tuple, GenericOperation, Literal from require 'type-track.meta'
 
 describe 'GenericOperation', ->
-	unit = Tuple {}
-	A = Literal 'A'
+	local A
+	lazy_setup ->
+		A = Literal 'A'
 
 	it 'is a Type', ->
 		gen_op = GenericOperation 'call', (->), (->)
@@ -53,4 +54,3 @@ describe 'GenericOperation', ->
 
 			assert.is_true GenericOperation.is_subset type1, type2
 			assert.is_true GenericOperation.is_subset type2, type1
-

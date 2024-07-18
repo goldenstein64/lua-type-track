@@ -1,6 +1,6 @@
 import
 	is_subset
-	Type, Tuple, Literal, Unknown, Never 
+	Type, Tuple, Literal, Unknown, Never
 from require 'type-track.meta'
 
 is_equiv = (a, b) -> (is_subset a, b) and (is_subset b, a)
@@ -10,11 +10,13 @@ describe 'Tuple', ->
 		tup = Tuple {}
 		assert.is_true tup\is_instance Type
 
-	-- local A, B, C = "A", "B", "C"
-	A = Literal 'A'
-	B = Literal 'B'
-	C = Literal 'C'
-	Nil = Literal nil
+	local A, B, C, Nil
+	lazy_setup ->
+		-- local A, B, C = "A", "B", "C"
+		A = Literal 'A'
+		B = Literal 'B'
+		C = Literal 'C'
+		Nil = Literal nil
 
 	describe 'is_subset', ->
 		it 'accepts shorter tuples but not converse', ->
@@ -119,7 +121,7 @@ describe 'Tuple', ->
 			normalized = tup\normalize!
 			assert.equal "Tuple", normalized.__class.__name
 			assert.equal "A", normalized\at(1).value
-			assert.equal "B", normalized.var_arg.value
+			assert.equal "B", normalized.var.value
 
 		it 'truncates middle tuples', ->
 			tup = Tuple { A, (Tuple { A, B }), C }
@@ -137,19 +139,18 @@ describe 'Tuple', ->
 			assert.equal "B", normalized\at(2).value
 			assert.equal "A", normalized\at(3).value
 			assert.equal "B", normalized\at(4).value
-			assert.equal "C", normalized.var_arg.value
+			assert.equal "C", normalized.var.value
 
-		it 'rejects conflicting var_arg on last tuple', ->
+		it 'rejects conflicting var on last tuple', ->
 			tup = Tuple { A, (Tuple {}, B) }, C
 
 			assert.is_nil tup\normalize!
 
-		it 'accepts subset var_arg on last tuple', ->
+		it 'accepts subset var on last tuple', ->
 			tup = Tuple { A, (Tuple {}, B) }, B + C
 
 			normalized = tup\normalize!
-			normalized_var = normalized.var_arg
+			normalized_var = normalized.var
 			expected_var = B + C
 			assert.equal "A", tup\at(1).value
 			assert.is_true is_equiv expected_var, normalized_var
-			

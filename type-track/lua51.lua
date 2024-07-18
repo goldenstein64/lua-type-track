@@ -1,15 +1,14 @@
 local meta_types = require("type-track.meta")
 
-local Type, Tuple, Operation, Literal, Free, Never, Unknown, GenericOperation, is_subset =
-	meta_types.Type,
-	meta_types.Tuple,
-	meta_types.Operation,
-	meta_types.Literal,
-	meta_types.Free,
-	meta_types.Never,
-	meta_types.Unknown,
-	meta_types.GenericOperation,
-	meta_types.is_subset
+local is_subset = meta_types.is_subset
+local Type = meta_types.Type
+local Operation = meta_types.Operation
+local Literal = meta_types.Literal
+local Tuple = meta_types.Tuple
+local Never, Unknown = meta_types.Never, meta_types.Unknown
+local GenericOperation = meta_types.GenericOperation
+local Free = meta_types.Free
+local Union, Intersection = meta_types.Union, meta_types.Intersection
 
 ---@generic F
 ---@param f F
@@ -28,13 +27,60 @@ local function memoize(f)
 		cache
 end
 
----modifies the type so it normalizes to itself
----@param t type-track.Type
----@return type-track.Type t
-local function axiom(t)
-	assert(t.__class ~= Free, "attempt to axiomatize a Free type")
-	t.normalized = t
-	return t
+local axiom
+do
+	---@type { [any]: fun(elem: type-track.Type) }
+	local axiom_handlers = {
+		---@param elem type-track.Operation
+		[Operation] = function(elem)
+			axiom(elem.domain)
+			axiom(elem.range)
+		end,
+		---@param elem type-track.Tuple
+		[Tuple] = function(elem)
+			for _, t in ipairs(elem.elements) do
+				axiom(t)
+			end
+			if elem.var then
+				axiom(elem.var)
+			end
+		end,
+		---@param elem type-track.Union
+		[Union] = function(elem)
+			for _, t in ipairs(elem.types) do
+				axiom(t)
+			end
+		end,
+		---@param elem type-track.Intersection
+		[Intersection] = function(elem)
+			for _, t in ipairs(elem.types) do
+				axiom(t)
+			end
+		end,
+		---@param elem type-track.Literal
+		[Literal] = function(elem)
+			if elem.of then
+				axiom(elem.of)
+			end
+		end,
+	}
+
+	---modifies the type so it normalizes to itself
+	---@param t type-track.Type
+	---@return type-track.Type t
+	function axiom(t)
+		local t_class = t.__class
+		assert(t_class ~= Free, "attempt to call axiom with a Free type")
+		if not t.normalized then
+			t.normalized = t
+			-- normalize children
+			local handler = axiom_handlers[t_class]
+			if handler then
+				handler(t)
+			end
+		end
+		return t
+	end
 end
 
 local T = Tuple
@@ -49,7 +95,7 @@ local number, _string, string_or_num, concat_call
 local function string_of(value)
 	return Literal(value, _string)
 end
-memoize(string_of)
+string_of = memoize(string_of)
 do
 	local number_ref = Free()
 	local string_ref = Free()
