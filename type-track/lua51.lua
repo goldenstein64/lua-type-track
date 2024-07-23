@@ -584,7 +584,7 @@ end, function(domain, range)
 	end
 end)
 
-local _collectgarbage = overloads(
+local _collectgarbage = overloads({
 	{ _nil, number },
 	{ unit, number },
 	{ string_of("collect"), number },
@@ -595,26 +595,26 @@ local _collectgarbage = overloads(
 	{ string_of("setpause"), number },
 	{ string_of("setstepmul"), number },
 	{ Tuple({ string_of("setpause"), num_or_nil }), number },
-	{ Tuple({ string_of("setstepmul"), num_or_nil }), number }
-)
+	{ Tuple({ string_of("setstepmul"), num_or_nil }), number },
+})
 
 local _dofile = func(string_or_nil, unknown_var)
 
-local _error = overloads(
+local _error = overloads({
 	{ Tuple({ _string, num_or_nil }), Never },
 	{ _string, Never },
-	{ unit, Never }
-)
+	{ unit, Never },
+})
 
 local __G = _table
 
 local _getfenv
 do
 	local getfenv_result = map_of(_string, Unknown) + _nil
-	_getfenv = overloads(
+	_getfenv = overloads({
 		{ unit, getfenv_result },
-		{ _function + _nil, getfenv_result }
-	)
+		{ _function + _nil, getfenv_result },
+	})
 end
 
 -- globals:
