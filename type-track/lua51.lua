@@ -167,6 +167,18 @@ local function func(params, returns)
 	return function_type * Operation("call", params, returns)
 end
 
+---@alias type-track.lua51.func_pair { [1]: type-track.Type, [2]: type-track.Type }
+
+---@param funcs type-track.lua51.func_pair[]
+local function overloads(funcs)
+	local components = { function_type }
+	for _, pair in ipairs(funcs) do
+		table.insert(components, Operation("call", pair[1], pair[2]))
+	end
+
+	return Intersection(components)
+end
+
 ---@param derive_fn type-track.GenericOperation.derive_fn
 ---@param infer_fn type-track.GenericOperation.infer_fn
 ---@return type-track.Type func
@@ -252,9 +264,10 @@ local tablelib = lib({
 		T({ array_of(_string), string_or_num_or_nil, num_or_nil, num_or_nil }),
 		_string
 	),
-	insert = func(T({ _table, Unknown }), unit)
-		* func(T({ _table, number, Unknown }), unit),
-
+	insert = overloads({
+		{ T({ _table, Unknown }), unit },
+		{ T({ _table, number, Unknown }), unit },
+	}),
 	maxn = func(_table, number),
 	remove = func(T({ _table, num_or_nil }), Unknown),
 	sort = func(T({ _table, _function }), unit),
@@ -338,16 +351,21 @@ local file_seek_mode_or_nil = file_seek_mode + _nil
 
 local vbuf_mode = string_of("no") + string_of("full") + string_of("line")
 
-local implicit_file = func(unit, file_or_fail) * func(file_ref, true_or_fail)
+local implicit_file = overloads({
+	{ unit, file_or_fail },
+	{ file_ref, true_or_fail },
+})
 local open_file =
 	func(T({ string_or_num, file_open_mode + _nil }), file_or_fail)
 
 local iolib = lib({
-	close = func(file_ref, true_or_fail) * func(unit, true_or_fail),
+	close = overloads({ { file_ref, true_or_fail }, { unit, true_or_fail } }),
 	flush = func(unit, true_or_fail),
 	input = implicit_file,
-	lines = func(unit, func(unit, _string))
-		* func(string_or_num, func(unit, _string)),
+	lines = overloads({
+		{ unit, func(unit, _string) },
+		{ string_or_num, func(unit, _string) },
+	}),
 	open = open_file,
 	output = implicit_file,
 	popen = open_file,
@@ -415,12 +433,12 @@ local string_or_nil = _string + _nil
 
 local oslib = lib({
 	clock = func(unit, number),
-	date = func(
-		T({ string_of("*t") + string_of("!*t"), num_or_nil }),
-		osdate_table
-	) * func(T({ _string, num_or_nil }), _string),
+	date = overloads({
+		{ T({ string_of("*t") + string_of("!*t"), num_or_nil }), osdate_table },
+		{ T({ _string, num_or_nil }), _string },
+	}),
 	difftime = num2_to_num,
-	execute = func(_nil, true_or_nil) * func(_string, os_result),
+	execute = overloads({ { _nil, true_or_nil }, { _string, os_result } }),
 	exit = func(string_or_num_or_nil, unit),
 	getenv = func(string_or_num, _string),
 	remove = func(string_or_num, true_or_fail),
@@ -477,10 +495,12 @@ local debuglib = lib({
 	debug = func(unit, unit),
 	getfenv = func(_function, _table),
 	gethook = func(thread_or_nil, _nil + T({ debug_hook, _string, number })),
-	getinfo = func(T({ thread, func_or_num, _string }), _table)
-		* func(T({ func_or_num, _string }), _table)
-		* func(T({ thread, func_or_num }), debug_info)
-		* func(func_or_num, debug_info),
+	getinfo = overloads({
+		{ T({ thread, func_or_num, _string }), _table },
+		{ T({ func_or_num, _string }), _table },
+		{ T({ thread, func_or_num }), debug_info },
+		{ func_or_num, debug_info },
+	}),
 	getlocal = func(T({ thread, number, number }), T({
 		_string,
 		Unknown --[[should be "any"]],
@@ -518,18 +538,24 @@ local debuglib = lib({
 
 		return nil
 	end),
-	sethook = func(T({ thread_or_nil, debug_hook, _string, num_or_nil }), unit)
-		* func(T({ thread_or_nil, _nil, string_or_nil, num_or_nil }), unit)
-		* func(T({ debug_hook, _string, num_or_nil }), unit)
-		* func(T({ _nil, string_or_nil, num_or_nil }), unit),
-	setlocal = func(T({ thread, number, number, Unknown }), string_or_nil)
-		* func(T({ number, number, Unknown }), string_or_nil),
+	sethook = overloads({
+		{ T({ thread_or_nil, debug_hook, _string, num_or_nil }), unit },
+		{ T({ thread_or_nil, _nil, string_or_nil, num_or_nil }), unit },
+		{ T({ debug_hook, _string, num_or_nil }), unit },
+		{ T({ _nil, string_or_nil, num_or_nil }), unit },
+	}),
+	setlocal = overloads({
+		{ T({ thread, number, number, Unknown }), string_or_nil },
+		{ T({ number, number, Unknown }), string_or_nil },
+	}),
 	setmetatable = func(T({ Unknown, table_or_nil }), unit),
 
 	setupvalue = func(T({ _function, number, Unknown }), string_or_nil),
 
-	traceback = func(T({ thread, string_or_nil, num_or_nil }), _string)
-		* func(T({ string_or_nil, num_or_nil }), _string),
+	traceback = overloads({
+		{ T({ thread, string_or_nil, num_or_nil }), _string },
+		{ T({ string_or_nil, num_or_nil }), _string },
+	}),
 })
 
 local packagelib = lib({
@@ -558,30 +584,37 @@ end, function(domain, range)
 	end
 end)
 
-local _collectgarbage = func(_nil, number)
-	* func(unit, number)
-	* func(string_of("collect"), number)
-	* func(string_of("stop"), number)
-	* func(string_of("restart"), number)
-	* func(string_of("count"), number)
-	* func(string_of("step"), boolean)
-	* func(string_of("setpause"), number)
-	* func(string_of("setstepmul"), number)
-	* func(Tuple({ string_of("setpause"), num_or_nil }), number)
-	* func(Tuple({ string_of("setstepmul"), num_or_nil }), number)
+local _collectgarbage = overloads(
+	{ _nil, number },
+	{ unit, number },
+	{ string_of("collect"), number },
+	{ string_of("stop"), number },
+	{ string_of("restart"), number },
+	{ string_of("count"), number },
+	{ string_of("step"), boolean },
+	{ string_of("setpause"), number },
+	{ string_of("setstepmul"), number },
+	{ Tuple({ string_of("setpause"), num_or_nil }), number },
+	{ Tuple({ string_of("setstepmul"), num_or_nil }), number }
+)
 
 local _dofile = func(string_or_nil, unknown_var)
 
-local _error = func(Tuple({ _string, num_or_nil }), Never)
-	* func(_string, Never)
-	* func(unit, Never)
+local _error = overloads(
+	{ Tuple({ _string, num_or_nil }), Never },
+	{ _string, Never },
+	{ unit, Never }
+)
 
 local __G = _table
 
 local _getfenv
 do
 	local getfenv_result = map_of(_string, Unknown) + _nil
-	_getfenv = func(unit, getfenv_result) * func(_function + _nil, getfenv_result)
+	_getfenv = overloads(
+		{ unit, getfenv_result },
+		{ _function + _nil, getfenv_result }
+	)
 end
 
 -- globals:
@@ -650,6 +683,7 @@ lua51.define = {
 	map_of = map_of,
 	array_of = array_of,
 	func = func,
+	overloads = overloads,
 	gen_func = gen_func,
 	lib = lib,
 }
