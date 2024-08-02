@@ -113,13 +113,18 @@ local all_are_subset
 ---@type fun(subset_list: type-track.Type[], superset: type-track.Type, i?: integer, j?: integer): boolean
 local any_are_subset
 
----@type fun(subset_list: type-track.Type[], superset: type-track.Type, i?: integer, j?: integer): boolean
+---@type fun(set1: type-track.Type, set2: type-track.Type): boolean
+local is_overlapping
+
+---@type fun(set1: type-track.Type, set2_list: type-track.Type[], i?: integer, j?: integer): boolean
 local any_overlap_with
 
----@type fun(subset_list: type-track.Type[], superset: type-track.Type, i?: integer, j?: integer): boolean
+---@type fun(set1: type-track.Type, set2_list: type-track.Type[], i?: integer, j?: integer): boolean
 local all_overlap_with
 
 --#region is_subset
+
+local subset_handlers
 
 ---determines whether `subset` is a subset of `superset`
 ---
@@ -167,20 +172,6 @@ local function is_subset(subset, superset)
 		return true
 	end
 
-	while subset.__class == GenericOperation do
-		---@cast subset type-track.GenericOperation
-		local new_subset = subset:match(superset)
-		if not new_subset then
-			return false
-		end
-		subset = new_subset
-	end
-
-	while superset.__class == GenericOperation do
-		---@cast superset type-track.GenericOperation
-		superset = assert(superset.derive_fn(unknown_var))
-	end
-
 	if subset == Never or superset == Unknown then
 		return true
 	end
@@ -198,69 +189,23 @@ local function is_subset(subset, superset)
 
 	if sub_cls == super_cls then
 		return sub_cls.is_subset(subset, superset)
-	end
-
-	-- supertype comparisons
-	if super_cls == Tuple then
-		---@cast superset type-track.Tuple
-		local superset_len = #superset.elements
-		if superset_len == 0 then
-			return not superset.var or is_subset(subset, superset.var)
-		elseif superset_len == 1 then
-			return is_subset(subset, superset.elements[1])
+	else
+		local sub_handler = subset_handlers[sub_cls]
+		if not sub_handler then
+			return false
 		end
 
-		return false
-	elseif super_cls == Union then
-		---@cast superset type-track.Union
-		if sub_cls == Operation then
-			---@cast subset type-track.Operation
-			local superset_domain = superset:get_domain(subset.op)
-			if not superset_domain then
-				return false
-			end
-			local superset_range = superset:eval(subset.op, superset_domain)
-			if not superset_range then
-				return false
-			end
-
-			-- handles (A & C) -> (B | D) <: (A -> B) | (C -> D)
-			return is_subset(superset_domain, subset.domain)
-				and is_subset(subset.range, superset_range)
+		local super_handler = sub_handler[super_cls]
+		if not super_handler then
+			return false
 		end
 
-		return is_subset_of_any(subset, superset.types)
-	elseif super_cls == Intersection then
-		---@cast superset type-track.Intersection
-		return is_subset_of_all(subset, superset.types)
+		return super_handler(subset, superset)
 	end
-
-	-- subtype comparisons
-	if sub_cls == Tuple then
-		---@cast subset type-track.Tuple
-		---@cast superset type-track.Operation | type-track.Literal
-		return Tuple.is_subset(subset, Tuple({ superset }))
-	elseif sub_cls == Union then
-		---@cast subset type-track.Union
-		---@cast superset type-track.Operation | type-track.Literal
-		-- the use cases for this are not significant
-		return all_are_subset(subset.types, superset)
-	elseif sub_cls == Intersection then
-		---@cast subset type-track.Intersection
-		---@cast superset type-track.Operation | type-track.Literal
-		return any_are_subset(subset.types, superset)
-	elseif sub_cls == Literal then
-		---@cast subset type-track.Literal
-		---@cast superset type-track.Operation
-		return is_subset(subset.of, superset)
-	elseif sub_cls == Operation then
-		---@cast subset type-track.Operation
-		---@cast superset type-track.Literal
-		return false
-	end
-
-	return false
 end
+
+---@type { [any]: { [any]: fun(set1: type-track.Type, set2: type-track.Type): boolean } }
+local overlapping_handlers
 
 ---@param set1 type-track.Type
 ---@param set2 type-track.Type
@@ -269,22 +214,24 @@ local function is_ordered_overlapping(set1, set2)
 	local set1_cls = set1.__class
 	local set2_cls = set2.__class
 
-	if set1_cls == Operation then
-	elseif set1_cls == Tuple then
-	elseif set1_cls == Union then
-	elseif set1_cls == Intersection then
-	elseif set1_cls == Literal then
-	elseif set1_cls == GenericOperation then
-	elseif set1_cls == Free then
+	local set1_handler = overlapping_handlers[set1_cls]
+	if not set1_handler then
+		return false
 	end
 
-	return true
+	local handler = set1_handler[set2_cls]
+	if not handler then
+		return false
+	end
+	---@cast handler fun(set1: type-track.Type, set2: type-track.Type): boolean
+
+	return handler(set1, set2) or false
 end
 
 ---@param set1 type-track.Type
 ---@param set2 type-track.Type
 ---@return boolean
-local function is_overlapping(set1, set2)
+function is_overlapping(set1, set2)
 	if rawequal(set1, set2) then
 		return true
 	end
@@ -1664,6 +1611,26 @@ do -- GenericOperation
 			and is_subset(superset_range, subset_range)
 	end
 
+	---@param set1 type-track.GenericOperation
+	---@param set2 type-track.GenericOperation
+	---@return boolean
+	function GenericOperation.is_overlapping(set1, set2)
+		local type_params = set1.infer_fn(Unknown, Unknown)
+		local set1_domain, set1_range = set1.derive_fn(unknown_var)
+		if not set1_domain or not set1_range then
+			return false
+		end
+
+		local set2_domain, set2_range = set2.derive_fn(unknown_var)
+		if not set2_domain or not set2_range then
+			return false
+		end
+
+		return set1.op ~= set2.op
+			or is_overlapping(set1_range, set2_range)
+			or not is_overlapping(set1_domain, set2_domain)
+	end
+
 	---@param op string
 	---@param domain type-track.Type
 	---@return type-track.Type? range
@@ -1863,6 +1830,245 @@ do -- Free
 		ref.dependencies = deps_data
 	end
 end
+
+do
+	---@type fun(subset: type-track.Tuple, superset: type-track.Type): boolean
+	local function tuple_is_subset_of_single(subset, superset)
+		local sub_len = #subset.elements
+		if sub_len == 0 then
+			return false
+		else
+			return is_subset(subset.elements[1], superset)
+		end
+	end
+
+	---@type fun(subset: type-track.Type, superset: type-track.Tuple): boolean
+	local function single_is_subset_of_tuple(subset, superset)
+		local super_len = #superset.elements
+		if super_len == 0 then
+			return not superset.var or is_subset(subset, superset.var)
+		elseif super_len == 1 then
+			return is_subset(subset, superset.elements[1])
+		else
+			return false
+		end
+	end
+
+	subset_handlers = {
+		[Operation] = {
+			---@type fun(subset: type-track.Operation, superset: type-track.Tuple): boolean
+			[Tuple] = single_is_subset_of_tuple,
+			---@type fun(subset: type-track.Operation, superset: type-track.Union): boolean
+			[Union] = function(subset, superset)
+				local super_domain = superset:get_domain(subset.op)
+				if not super_domain then
+					return false
+				end
+
+				local super_range = superset:eval(subset.op, super_domain)
+				if not super_range then
+					return false
+				end
+
+				return is_subset(super_domain, subset.domain)
+					and is_subset(subset.range, super_range)
+			end,
+			---@type fun(subset: type-track.Operation, superset: type-track.Intersection): boolean
+			[Intersection] = function(subset, superset)
+				return is_subset_of_all(subset, superset.types)
+			end,
+			---@type fun(subset: type-track.Operation, superset: type-track.Literal): boolean
+			[Literal] = function(subset, superset)
+				return false
+			end,
+			---@type fun(subset: type-track.Operation, superset: type-track.GenericOperation): boolean
+			[GenericOperation] = function(subset, superset)
+				return is_subset(subset, assert(superset.derive_fn(Unknown)))
+			end,
+		},
+		[Tuple] = {
+			---@type fun(subset: type-track.Tuple, superset: type-track.Operation): boolean
+			[Operation] = tuple_is_subset_of_single,
+			---@type fun(subset: type-track.Tuple, superset: type-track.Union): boolean
+			[Union] = function(subset, superset)
+				local subset_len = #subset.elements
+				if subset_len == 0 then
+					-- a normalized union will always have a non-zero tuple-ish element
+					return false
+				else
+					-- using is_subset_of_any leads to true negatives where
+					-- is_subset((A | B, C | D), [all permutations]) fails
+					-- would it be possible to handle that case by itself? in `is_subset`?
+					-- probably not the best idea? idk???
+					--
+					-- using an operation abstraction would sidestep this issue. Let's
+					-- assume this is what we're doing. In which case, use
+					-- is_subset_of_any.
+					return is_subset_of_any(subset, superset.types)
+				end
+			end,
+			---@type fun(subset: type-track.Tuple, superset: type-track.Intersection): boolean
+			[Intersection] = function(subset, superset)
+				return is_subset_of_all(subset, superset.types)
+			end,
+			---@type fun(subset: type-track.Tuple, superset: type-track.Literal): boolean
+			[Literal] = tuple_is_subset_of_single,
+			---@type fun(subset: type-track.Tuple, superset: type-track.GenericOperation): boolean
+			[GenericOperation] = tuple_is_subset_of_single,
+		},
+		[Union] = {
+			---@type fun(subset: type-track.Union, superset: type-track.Operation): boolean
+			[Operation] = function(subset, superset)
+				return all_are_subset(subset.types, superset)
+			end,
+			---@type fun(subset: type-track.Union, superset: type-track.Tuple): boolean
+			[Tuple] = function(subset, superset)
+				return all_are_subset(subset.types, superset)
+			end,
+			---@type fun(subset: type-track.Union, superset: type-track.Intersection): boolean
+			[Intersection] = function(subset, superset)
+				for _, sub_t in ipairs(subset.types) do
+					if not is_subset_of_all(sub_t, superset.types) then
+						return false
+					end
+				end
+
+				return true
+			end,
+			---@type fun(subset: type-track.Union, superset: type-track.Literal): boolean
+			[Literal] = function(subset, superset)
+				return all_are_subset(subset.types, superset)
+			end,
+			---@type fun(subset: type-track.Union, superset: type-track.GenericOperation): boolean
+			[GenericOperation] = function(subset, superset)
+				return all_are_subset(subset.types, superset)
+			end,
+		},
+		[Intersection] = {
+			---@type fun(subset: type-track.Intersection, superset: type-track.Operation): boolean
+			[Operation] = function(subset, superset)
+				return any_are_subset(subset.types, superset)
+			end,
+			---@type fun(subset: type-track.Intersection, superset: type-track.Tuple): boolean
+			[Tuple] = function(subset, superset)
+				return any_are_subset(subset.types, superset)
+			end,
+			---@type fun(subset: type-track.Intersection, superset: type-track.Union): boolean
+			[Union] = function(subset, superset)
+				return is_subset_of_any(subset, superset.types)
+			end,
+			---@type fun(subset: type-track.Intersection, superset: type-track.Literal): boolean
+			[Literal] = function(subset, superset)
+				return any_are_subset(subset.types, superset)
+			end,
+			---@type fun(subset: type-track.Intersection, superset: type-track.GenericOperation): boolean
+			[GenericOperation] = function(subset, superset)
+				return any_are_subset(subset.types, superset)
+			end,
+		},
+		[Literal] = {
+			---@type fun(subset: type-track.Literal, superset: type-track.Tuple): boolean
+			[Tuple] = single_is_subset_of_tuple,
+			---@type fun(subset: type-track.Literal, superset: type-track.Union): boolean
+			[Union] = function(subset, superset)
+				return is_subset_of_any(subset, superset.types)
+			end,
+			---@type fun(subset: type-track.Literal, superset: type-track.Intersection): boolean
+			[Intersection] = function(subset, superset)
+				return is_subset_of_all(subset, superset.types)
+			end,
+			---@type fun(subset: type-track.Literal, superset: type-track.Operation): boolean
+			[Operation] = function(subset, superset)
+				return is_subset(subset.of, superset)
+			end,
+			---@type fun(subset: type-track.Literal, superset: type-track.GenericOperation): boolean
+			[GenericOperation] = function(subset, superset)
+				return is_subset(subset.of, superset)
+			end,
+		},
+		[GenericOperation] = {
+			---@type fun(subset: type-track.GenericOperation, superset: type-track.Tuple): boolean
+			[Tuple] = single_is_subset_of_tuple,
+			---@type fun(subset: type-track.GenericOperation, superset: type-track.Union): boolean
+			[Union] = function(subset, superset)
+				return is_subset_of_any(subset, superset.types)
+			end,
+			---@type fun(subset: type-track.GenericOperation, superset: type-track.Intersection): boolean
+			[Intersection] = function(subset, superset)
+				return is_subset_of_all(subset, superset.types)
+			end,
+			---@type fun(subset: type-track.GenericOperation, superset: type-track.Literal): boolean
+			[Literal] = function(subset, superset)
+				return false
+			end,
+			---@type fun(subset: type-track.GenericOperation, superset: type-track.Operation): boolean
+			[Operation] = function(subset, superset)
+				local match = subset:match(superset)
+				if not match then
+					return false
+				end
+
+				return is_subset(match, superset)
+			end,
+		},
+	}
+end
+
+overlapping_handlers = {
+	[Operation] = {
+		---@type fun(set1: type-track.Operation, set2: type-track.Tuple): boolean
+		[Tuple] = function(set1, set2)
+			local set2_len = #set2.elements
+			if set2_len == 0 then
+				return not set2.var or is_overlapping(set1, set2.var)
+			else
+				return is_overlapping(set1, set2.elements[1])
+			end
+		end,
+		---@type fun(set1: type-track.Operation, set2: type-track.Union): boolean\
+		[Union] = function(set1, set2)
+			return any_overlap_with(set1, set2.types)
+		end,
+		---@type fun(set1: type-track.Intersection, set2: type-track.GenericOperation): boolean
+		[Intersection] = function(set1, set2) end,
+		---@type fun(set1: type-track.Literal, set2: type-track.GenericOperation): boolean
+		[Literal] = function(set1, set2) end,
+		---@type fun(set1: type-track.Operation, set2: type-track.GenericOperation): boolean
+		[GenericOperation] = function(set1, set2) end,
+	},
+	[Tuple] = {
+		---@type fun(set1: type-track.Tuple, set2: type-track.Union): boolean
+		[Union] = function(set1, set2) end,
+		---@type fun(set1: type-track.Tuple, set2: type-track.Intersection): boolean
+		[Intersection] = function(set1, set2) end,
+		---@type fun(set1: type-track.Tuple, set2: type-track.Literal): boolean
+		[Literal] = function(set1, set2) end,
+		---@type fun(set1: type-track.Tuple, set2: type-track.GenericOperation): boolean
+		[GenericOperation] = function(set1, set2) end,
+	},
+	[Union] = {
+		---@type fun(set1: type-track.Union, set2: type-track.Intersection): boolean
+		[Intersection] = function(set1, set2) end,
+		---@type fun(set1: type-track.Union, set2: type-track.Literal): boolean
+		[Literal] = function(set1, set2)
+			return any_overlap_with(set2, set1.types)
+		end,
+		---@type fun(set1: type-track.Union, set2: type-track.GenericOperation): boolean
+		[GenericOperation] = function(set1, set2) end,
+	},
+	[Intersection] = {
+		---@type fun(set1: type-track.Intersection, set2: type-track.Literal): boolean
+		[Literal] = function(set1, set2)
+			return all_overlap_with(set2, set1.types)
+		end,
+		---@type fun(set1: type-track.Intersection, set2: type-track.GenericOperation): boolean
+		[GenericOperation] = function(set1, set2) end,
+	},
+	[Literal] = {
+		---@type fun(set1: type-track.Literal, set2: type-track.GenericOperation): boolean
+		[GenericOperation] = function(set1, set2) end,
+	},
+}
 
 meta.Operation = Operation
 meta.Tuple = Tuple

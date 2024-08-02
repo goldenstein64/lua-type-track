@@ -1,5 +1,5 @@
 import
-	is_subset
+	is_subset, is_overlapping
 	Type, Tuple, Literal, Unknown, Never
 from require 'type-track.meta'
 
@@ -106,6 +106,7 @@ describe 'Tuple', ->
 			tup1 = Tuple { A, B }, C
 			tup2 = Tuple { A, B, C + E, C + D }
 
+			assert.is_true is_overlapping C, C + E
 			assert.is_true Tuple.is_overlapping tup1, tup2
 
 		it 'rejects tuples where shorter has disjoint vars', ->

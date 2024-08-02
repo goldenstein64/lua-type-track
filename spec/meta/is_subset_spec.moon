@@ -165,3 +165,38 @@ describe 'is_subset', ->
 
 		assert.is_true is_subset mapBC, mapC
 		assert.is_false is_subset mapC, mapBC
+
+	pending 'accepts (A, B) | (C, D) <: (A | C, B | D)', ->
+		union = Union {
+			Tuple { A, B }
+			Tuple { B, C }
+		}
+
+		tup = Tuple {
+			Union { A, C }
+			Union { B, D }
+		}
+
+		assert.is_true is_subset union, tup
+		assert.is_false is_subset tup, union
+
+	pending 'accepts (A | B, C | D) == (A, C) | (A, D) | (B, C) | (B, D)', ->
+		tup = Tuple {
+			Union { A, B }
+			Union { C, D }
+		}
+
+		union = Union {
+			Tuple { A, C }
+			Tuple { A, D }
+			Tuple { B, C }
+			Tuple { B, D }
+		}
+
+		assert.is_true is_subset tup, union
+		assert.is_true is_subset union, tup
+
+	it 'accepts () <: { x: A -> B }', ->
+		op = Operation 'x', A, B
+
+		assert.is_false is_subset Tuple.Unit, op

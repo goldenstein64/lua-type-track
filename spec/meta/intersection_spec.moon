@@ -38,6 +38,14 @@ describe 'Intersection', ->
 			for t in *normalized.types
 				assert.is_false t\is_instance Intersection
 
+		it 'simplifies unions inside intersections', ->
+			inter = Intersection { A, Union { A, B } }
+
+			normalized = inter\normalize!
+
+			assert.is_true normalized.__class == Literal
+			assert.equal "A", normalized.value
+
 		it 'simplifies nested intersections with duplicates', ->
 			inter = Intersection { A, Intersection { A, B } }
 
