@@ -1831,7 +1831,7 @@ do -- Free
 	end
 end
 
-do
+do -- subset_handlers
 	---@type fun(subset: type-track.Tuple, superset: type-track.Type): boolean
 	local function tuple_is_subset_of_single(subset, superset)
 		local sub_len = #subset.elements
