@@ -144,7 +144,7 @@ describe 'Intersection', ->
 			assert.is_true is_subset range, target
 			assert.is_true is_subset target, range
 
-		it 'compares sub-elements in the same direction original call', ->
+		it 'compares sub-elements in the same direction as the original call', ->
 			inter1 = Intersection {
 				Operation 'call', A, (Intersection { A, B, C })
 				A, B, C
