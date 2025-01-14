@@ -91,7 +91,7 @@ assert(is_subset(result, number))
 ```
 
 The `is_subset` function is used to compare two types. Most of the time, it's
-used to check if one type is *assignable* to another. For example, if a
+used to check if one type is _assignable_ to another. For example, if a
 variable `n` is supposed to hold a number, the literal `15` can be used to
 define it because it is a subtype of `number`.
 
@@ -110,7 +110,7 @@ assert(
 If one tried to assign, say, a string to `n`, the `is_subset` constraint would
 fail because it's not a subtype of `number`.
 
-The *assignability* constraint is used in more places than assignment. It's
+The _assignability_ constraint is used in more places than assignment. It's
 also used to check whether a function can accept a parameter. For example, the
 function `incr` cannot accept a variable of type `string`. It should return
 `nil` because the evaluation failed.

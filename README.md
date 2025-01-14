@@ -1,7 +1,8 @@
 # lua-type-track
 
 > [!WARNING]
-> *This project is de-funct!* Don't expect it to work. This is just
+>
+> _This project is de-funct!_ Don't expect it to work. This is just
 > documentation of work I've tried and failed to contribute with.
 
 I stopped working on this project because operations aren't fundamentally
@@ -12,15 +13,25 @@ decomposable into smaller parts without breaking soundness.
 --- (index(number) -> string) & (newindex(number, string) -> ())
 ```
 
-This is bad because every type in Lua is fundamentally cyclic, via the fundamental `select` operation. Every type is able to compute `select(1, ...Type)`, which means the `is_subset` predicate would have to be able to handle cyclic cases in a fundamentally sound and computable way, which is a lot of work, the way this codebase is written (at least if I were to add a `visited` argument to every function), and may not even be possible.
+This is bad because every type in Lua is fundamentally cyclic, via the
+fundamental `select` operation. Every type is able to compute `select(1, ...
+Type)`, which means the `is_subset` predicate would have to be able to handle
+cyclic cases in a fundamentally sound and computable way, which is a lot of
+work, the way this codebase is written (at least if I were to add a `visited`
+argument to every function), and may not even be possible.
 
-This is a Lua library for implementing static analysis of a Lua-like duck type system.
+This is a Lua library for implementing static analysis of a Lua-like duck type
+system.
 
-The `negation-types` branch is my attempt to write the `is_disjoint` predicate, which would be the basis for complement types, used for type refinement. Because of the fundamental undecomposable operation problem, I couldn't get very far.
+The `negation-types` branch is my attempt to write the `is_disjoint` predicate,
+which would be the basis for complement types, used for type refinement.
+Because of the fundamental undecomposable operation problem, I couldn't get
+very far.
 
 ## Installing
 
-These files aren't published anywhere, so just clone the repo and use LuaRocks to install dependencies:
+These files aren't published anywhere, so just clone the repo and use LuaRocks
+to install dependencies:
 
 ```sh
 $ git clone https://github.com/goldenstein64/lua-type-track
@@ -43,7 +54,8 @@ This system implements duck-typing using a set of meta-types:
 - `Never` - the bottom type
 - `Unknown` - the top type
 - `Literal(value, of)` - a type representing exactly one value
-- `GenericOperation(op, derive_fn, infer_fn)` - an operation implemented using a pair of functions
+- `GenericOperation(op, derive_fn, infer_fn)` - an operation implemented using
+  a pair of functions
 - `Free` - a placeholder for implementing cyclic types
 
 All of these meta-types support a common set of methods:
@@ -127,8 +139,9 @@ calling and variable binding semantics.
 
 ## Gotchas
 
-- `any` is not a type in this system because `any` *ignores* types. Use a
-  sentinel value in place of a type object when you need `any`. You can wrap `is_subset` so that it returns early when finding `any`.
+- `any` is not a type in this system because `any` _ignores_ types. Use a
+  sentinel value in place of a type object when you need `any`. You can wrap
+  `is_subset` so that it returns early when finding `any`.
 
 - A function that never returns (i.e. infinite loops and guaranteed errors) has
   a return type of `Never`. A function that returns zero values (e.g. `print`)
@@ -146,7 +159,8 @@ local op = Operation("call", A, B) -- ("A") -> "B"
 local args = Tuple({ A, Unknown })
 
 -- op:eval "call" accepts ("A", unknown)
-print(op:eval("call", args)) --> { _type = "Literal", value = "B", of = "unknown" }
+print(op:eval("call", args))
+--> { _type = "Literal", value = "B", of = "unknown" }
 
 ---@param args type-track.Type
 ---@return boolean passed, string? err_msg
