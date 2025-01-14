@@ -3,9 +3,9 @@
 - Types are represented as a set of possible concrete values
 - A variable contains two types. Both types are either directly inherited from
   its type annotation or inferred from the AST.
-   - A reference type: the most specific type a variable can be assigned to.
-   - A definition type: the most general type that can be assigned to that
-     variable.
+  - A reference type: the most specific type a variable can be assigned to.
+  - A definition type: the most general type that can be assigned to that
+    variable.
 - Whenever a variable A gets assigned to a variable B, we check to see if A's
   reference type is a subset of B's definition type. We are asserting that
   reference A is assignable to definition B.
@@ -41,8 +41,8 @@ reference and definition types respectively.
 Essentially, types can be constructed in two primitive ways:
 
 - A callable type, which at its most basic usage is a function that can be
-called with certain arguments, each of which get a variable number of parameter
-types and a variable number of return types.
+  called with certain arguments, each of which get a variable number of parameter
+  types and a variable number of return types.
 
 - An object type, which defines what operations are valid on a type as callable
   interfaces.
@@ -52,7 +52,7 @@ types and a variable number of return types.
     or `nil`.
 
 Each of the primitive types can be represented as just objects. The `function`
-type *could* be represented as a callable of type `(...any) -> (...any)`
+type _could_ be represented as a callable of type `(...any) -> (...any)`
 
 How would we check whether a callable `A` is a subset of a callable `B`? Well,
 let's imagine them as variables.
@@ -104,6 +104,7 @@ a_and_b = a -- warning: a's type doesn't satisfy all of a_and_b's definitions
 ```
 
 There are three things this type system has to support:
+
 - Set relationships, `:is_subset`
 - Object operator semantics, `:evaluate(op, params)`
 - Callable semantics, `:call(params)`
@@ -138,13 +139,17 @@ local file = shape {
 ```
 
 The difficulty here is comparing types to types...
+
 1. Create a way to generate a dummy type from a type; it should always validate
    against itself.
-  * This seems to be error-prone, and might not be feasible for some types (e.g.
-    `types.pattern`)
+
+- This seems to be error-prone, and might not be feasible for some types (e.g.
+  `types.pattern`)
+
 2. Create a way to generate a type-type from a type, i.e. a type that validates
    other types
-  * This could be inferred from the type's class, most likely
+
+- This could be inferred from the type's class, most likely
 
 #1 seems like the simplest and most straight-forward.
 
@@ -186,7 +191,7 @@ type B = { index: ("x") -> (number) } & { index: ("y") -> (number) }
 ```
 
 Both are valid ways to represent the same type, but apparently it can't be
-proved that `A <: B` because `is_subset(A, B[i])` is not true for any *one*
+proved that `A <: B` because `is_subset(A, B[i])` is not true for any _one_
 element `B[i]`, even though this is the case when all of `B` is considered.
 
 The first approach to fixing this was creating an algorithm that converted an
@@ -338,7 +343,7 @@ never be equal to each other.
   `"bar"` are disjoint.
 - An intersection containing `"foo"` will never equal an intersection containing
   `"bar"`, so those two intersections are disjoint.
-- A union containing `"foo"` will never be equal to a union that does *not*
+- A union containing `"foo"` will never be equal to a union that does _not_
   contain `"foo"`.
 
 Operations are difficult to reason about in terms of disjointness because
@@ -356,21 +361,21 @@ is_overlapping(set1, set2) == is_overlapping(set1:eval("type", unit), set2:eval(
 assert(not is_overlapping(_string, number))
 ```
 
-   For types with identical domains, this is great! However, I am not
-   sure what the logic should be for different domains. My past experience with
-   unions and intersections tells me that I should use the counterpart on the
-   domain, i.e. `is_subset(set1, set2) and is_subset(set2, set1)` or its
-   converse. What other set relations can there be? If you negate one side of an
-   `is_subset` relation, you're then comparing the two using `is_overlapping`.
-   I guess checking if two sets are equal (which is double `is_subset`) would be
-   as close to an inverse relation as I can get.
+For types with identical domains, this is great! However, I am not
+sure what the logic should be for different domains. My past experience with
+unions and intersections tells me that I should use the counterpart on the
+domain, i.e. `is_subset(set1, set2) and is_subset(set2, set1)` or its
+converse. What other set relations can there be? If you negate one side of an
+`is_subset` relation, you're then comparing the two using `is_overlapping`.
+I guess checking if two sets are equal (which is double `is_subset`) would be
+as close to an inverse relation as I can get.
 
-   There must be some greater truth I could be using to arrive at this
-   conclusion though... otherwise, I might be wrong and something else will be
-   unsound along the way because of that, like what happened with tuples.
+There must be some greater truth I could be using to arrive at this
+conclusion though... otherwise, I might be wrong and something else will be
+unsound along the way because of that, like what happened with tuples.
 
 | overlapping?   | domain equal | domain relative | domain overlaps | domain disjoint |
-|----------------|--------------|-----------------|-----------------|-----------------|
+| -------------- | ------------ | --------------- | --------------- | --------------- |
 | range equal    | yes          | yes             | yes             | no              |
 | range relative | yes          | yes             | yes             | no              |
 | range overlaps | yes          | yes             | yes             | no              |
@@ -434,6 +439,7 @@ local emptyTable = Intersection({
 For intersections, everything in the former must overlap with everything in the
 latter. If one pair is found that does not follow this, it can be proven that
 the intersections do not overlap.
+
 - Although this makes sense, it doesn't make sense for e.g. intersections that
   compose tables. If they have even two operations, the entire thing falls
   apart! Even comparing two things of the same type to each other would be
@@ -616,6 +622,7 @@ those operations return literals, they would be tested with simple equality...
   means there is a class for `String`, `Number`, `Boolean`, `True`, `False`, and
   `Nil`. Literals are special cases for any of these primitives and possibly
   other types too.
+
   - This would break the vision of making `type-track` language-agnostic, bad.
 
 - Possibly the easiest way to do this is to make number ranges a meta-type but
@@ -682,7 +689,6 @@ end
 > this behavior supposed to be overridden?
 
 I suppose the Unit type would also have to be its own meta-type?
-
 
 ```lua
 local UnitClass = muun("Unit", Type)
@@ -1230,7 +1236,7 @@ T = ("B" * "A") + "B"
 T = ("A" * "B") + "B"
 ```
 
-This gave two *brand new* types. What happens if a second substitution was
+This gave two _brand new_ types. What happens if a second substitution was
 performed?
 
 ```lua
@@ -1271,7 +1277,7 @@ T = ("A" * "B") + "B"
 U = ("A" * "B") + ("A" * "C") + "B" + "C"
 ```
 
-In *both* cases, `T` is in fact a subset of `U`. And even if the substitution
+In _both_ cases, `T` is in fact a subset of `U`. And even if the substitution
 wasn't performed, that statement would still be true in both cases. I suppose
 this makes comparisons across cycles simple, sort of.
 
@@ -1461,7 +1467,7 @@ Perhaps pending values could be ignored, e.g. it's `true` for `all` relations
 and `false` for `any` relations.
 
 How would operations in unions interact with `Pending` then? Operations would
-likely use a `true` value because operations require *all* of three conditions
+likely use a `true` value because operations require _all_ of three conditions
 to be true for the subset relation to exist.
 
 ```lua
@@ -1511,6 +1517,7 @@ flip-flop.
 
 So my current plan for making `is_subset` handle cycles is letting it return one
 of three values:
+
 - `true`
 - `false`
 - an array of cycles, each implemented as a list of instructions showing how to
@@ -1551,9 +1558,11 @@ of `T` and prove that it's equal to another type through induction. Let's give
 it a try.
 
 Every time we perform a substitution, we are given one requirement:
+
 - it must have `"A"`
 
 And we are given two options as to what `"A"` intersects with:
+
 - left: `T * "A"`, which simplifies to `T`
 - right: `"B"`
 
@@ -1565,6 +1574,7 @@ followed by an intersection with `"B"`, which simplifies to just `"A" * "B"`.
 So a subset of `T` must be either `"B"`, `"A"` intersected with an
 infinite number of `"A"`s, or `"A"` intersected with a finite number of `"A"`s
 and `"B"`. This gives us three options for subsets of `T`:
+
 - `"A"`
 - `"A" * "B"`
 - `"B"`
@@ -1633,11 +1643,12 @@ And >1-cycle types can be turned into 1-cycle types using substitution. Thus,
 the problem of cyclic types has been solved for intersections and unions. At
 least conceptually.
 
-This *still* doesn't solve the issue of cyclic types stemming from operations.
+This _still_ doesn't solve the issue of cyclic types stemming from operations.
 Complement meta-types would also suffer from this issue as an extra layer of
 abstraction.
 
 Here are some issues with solving cyclic types in operations:
+
 1. for the most part, operations are not distributive across intersections/
    unions. That means they can't be standardized to one model as easily as them.
    This isn't really true for complement types, so maybe there's still hope.
@@ -1709,7 +1720,7 @@ P<0> = "B"
 P = P<0> + P<1> + P<2> + ... + P<math.huge>
 ```
 
-And the FSM for *that* would be possible to present finitely:
+And the FSM for _that_ would be possible to present finitely:
 
 ```lua
 (P<n>) -> (P<n - 1> >> "A")
