@@ -1,9 +1,10 @@
 ---a collection of classes describing how all types are constructed
 local meta = {}
 
-local muun = require("type-track.muun")
+local muun = require("type-track.pkg.muun")
 local Inheritable = require("type-track.Inheritable")
 local permute = require("type-track.permute")
+local tuple = require("type-track.pkg.tuple")
 
 ---a multi-value type. Importantly, it describes how arguments and return
 ---values are structured.

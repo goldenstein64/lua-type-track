@@ -1,4 +1,4 @@
-local muun = require("type-track.muun")
+local muun = require("type-track.pkg.muun")
 
 ---@class Inheritable
 ---@field __class any
