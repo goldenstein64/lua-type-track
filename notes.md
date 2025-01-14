@@ -1328,11 +1328,11 @@ U = ("A" * "B") + ("A" * "C") + "B" + "C"
 
 Quite troubling... let's say we perform the substitution anyway.
 
-If `T` is one of the two cases, `case1 + case2`, then `T` is not a subset of 
-`U`. If `T` is both cases at the same time, `case1 * case2`, then `T` is a 
+If `T` is one of the two cases, `case1 + case2`, then `T` is not a subset of
+`U`. If `T` is both cases at the same time, `case1 * case2`, then `T` is a
 subset of `U`.
 
-We could say as a general rule that cyclic types are never subsets of acyclic 
+We could say as a general rule that cyclic types are never subsets of acyclic
 types... I'm not sure if that would be logical though.
 
 We could take an approach where both cases are combined into one type under
@@ -1509,26 +1509,26 @@ flip-flop.
 
 ---
 
-So my current plan for making `is_subset` handle cycles is letting it return one 
+So my current plan for making `is_subset` handle cycles is letting it return one
 of three values:
 - `true`
 - `false`
-- an array of cycles, each implemented as a list of instructions showing how to 
+- an array of cycles, each implemented as a list of instructions showing how to
   navigate the type graph.
 
 If a boolean is returned, we're done.
 
-If an array of cycles is returned, we prove that the subset contains all of 
-them. This is done by navigating each path in the cycle and seeing if it's 
-either equal to the subset or a subset of the superset. The latter implies an 
+If an array of cycles is returned, we prove that the subset contains all of
+them. This is done by navigating each path in the cycle and seeing if it's
+either equal to the subset or a subset of the superset. The latter implies an
 infinite loop, so either it should be implemented carefully or not at all.
 
-The way we navigate the type graph is important! if the superset uses an 
-`Operation`, perhaps the subset uses an `Intersection` with it included. In 
+The way we navigate the type graph is important! if the superset uses an
+`Operation`, perhaps the subset uses an `Intersection` with it included. In
 effect, we aren't navigating the data structure directly. Instead, we navigate
 through the domains and ranges of the type.
 
-I should note that normalization doesn't cover all cases of unions and 
+I should note that normalization doesn't cover all cases of unions and
 intersections as mentioned above. Cases of one mentioned operation is trivial,
 but every additional operation adds a dimension to the issue.
 
@@ -1547,7 +1547,7 @@ T = ("A" * "B") + "B"
 ```
 
 It would be great if there was a way to generate an infinite union/intersection
-of `T` and prove that it's equal to another type through induction. Let's give 
+of `T` and prove that it's equal to another type through induction. Let's give
 it a try.
 
 Every time we perform a substitution, we are given one requirement:
@@ -1557,26 +1557,26 @@ And we are given two options as to what `"A"` intersects with:
 - left: `T * "A"`, which simplifies to `T`
 - right: `"B"`
 
-Let's say we keep going left forever. We would just have an infinite 
-intersection of `"A"`s which simplify to just `"A"`. If we take a right even 
+Let's say we keep going left forever. We would just have an infinite
+intersection of `"A"`s which simplify to just `"A"`. If we take a right even
 once, the chain ends, and we end up with a finite number of `"A"` intersections
 followed by an intersection with `"B"`, which simplifies to just `"A" * "B"`.
 
-So a subset of `T` must be either `"B"`, `"A"` intersected with an 
-infinite number of `"A"`s, or `"A"` intersected with a finite number of `"A"`s 
+So a subset of `T` must be either `"B"`, `"A"` intersected with an
+infinite number of `"A"`s, or `"A"` intersected with a finite number of `"A"`s
 and `"B"`. This gives us three options for subsets of `T`:
 - `"A"`
 - `"A" * "B"`
 - `"B"`
 
-Given all other subsets of `T` simplify to one of these three types, we can 
+Given all other subsets of `T` simplify to one of these three types, we can
 safely conclude that `T` is simply a union of these three resulting types.
 
 ```lua
 T_acyclic = "A" + ("A" * "B") + "B"
 ```
 
-So `T` is equivalent to case 1. 
+So `T` is equivalent to case 1.
 
 We can compare this to a finite state machine involving the three options.
 
@@ -1588,7 +1588,7 @@ We can compare this to a finite state machine involving the three options.
 (T * "A") -> ("A" * "B")
 ```
 
-All subsets of `T` would be required to follow this finite state machine or 
+All subsets of `T` would be required to follow this finite state machine or
 break its own definition.
 
 What if `T` were a little more complex?
@@ -1628,9 +1628,9 @@ T = (T * "B") + ("A" * "B")
 Normalization gives it the same shape as intersection being first.
 
 So, cyclic types can be turned into acyclic types by turning it into an FSM and
-considering the case of traveling down one path of the FSM forever as an option. 
-And >1-cycle types can be turned into 1-cycle types using substitution. Thus, 
-the problem of cyclic types has been solved for intersections and unions. At 
+considering the case of traveling down one path of the FSM forever as an option.
+And >1-cycle types can be turned into 1-cycle types using substitution. Thus,
+the problem of cyclic types has been solved for intersections and unions. At
 least conceptually.
 
 This *still* doesn't solve the issue of cyclic types stemming from operations.
@@ -1656,7 +1656,7 @@ assert(is_subset(W, V))
 
 ---
 
-Is there a way to make them standardized here? There's likely a way to split the 
+Is there a way to make them standardized here? There's likely a way to split the
 domain and range to one element each.
 
 ```lua
@@ -1676,7 +1676,7 @@ W = -- normalizing W...
 -- The union of `W` contains `V` verbatim
 ```
 
-So it does so happen that unions/intersections in domains/ranges can be 
+So it does so happen that unions/intersections in domains/ranges can be
 distributed.
 
 ---
@@ -1696,7 +1696,7 @@ P = (P >> "A") + "B"
 (P >> "A") -> ("B" >> "A")
 ```
 
-In this case, `P` truly becomes an infinitely descending type. Is there some 
+In this case, `P` truly becomes an infinitely descending type. Is there some
 sort of logic I can use that makes this type "pseudo-reducible"?
 
 `P` could be modeled as a recursive function/generic like this:
@@ -1729,8 +1729,8 @@ Can I present `P` in terms of `P<n>` as an FSM though? Sort of I guess??
 ```
 
 So a subset of `P` would have to be able to travel through this FSM. It would be
-very inefficient to travel through this FSM though, with a complexity of 
-`O(n^2)`... if every union-element in the subset of `P` could first determine 
+very inefficient to travel through this FSM though, with a complexity of
+`O(n^2)`... if every union-element in the subset of `P` could first determine
 their `P<0>` and build up to `P<n>`, that would be faster.
 
 How would cyclic types travel through this FSM though? Not sure lol. That takes
@@ -1738,12 +1738,12 @@ a lot of brainpower to figure out... for starters, cyclic types wouldn't have a
 `P<0>`.
 
 It would probably have to be proven via induction, which means coming up with a
-base case and a formula for a recursive case. Of course, since our system 
+base case and a formula for a recursive case. Of course, since our system
 "generates" the proof, the formula would have to be concrete somehow.
 
-Representing `P` as a function here may not be doable for functions that have 
+Representing `P` as a function here may not be doable for functions that have
 multiple parameters.
 
 Would it be better to write every type as an FSM, and checking a subset of that
-type would either mean making it travel through the FSM or comparing the 
+type would either mean making it travel through the FSM or comparing the
 structure of the FSM directly?

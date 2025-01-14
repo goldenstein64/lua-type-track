@@ -1218,7 +1218,7 @@ do -- Intersection
 	---@return boolean
 	function Intersection.is_subset(subset, superset)
 		for _, supertype in ipairs(superset.types) do
-			if not is_subset_of_any(supertype, subset.types) then
+			if not any_are_subset(subset.types, supertype) then
 				return false
 			end
 		end
