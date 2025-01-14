@@ -1,5 +1,5 @@
 rockspec_format = "3.0"
-package = "type-tracker"
+package = "type-track"
 version = "dev-1"
 source = {
 	url = "https://github.com/goldenstein64/lua-type-track",
