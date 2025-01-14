@@ -12,7 +12,9 @@ decomposable into smaller parts without breaking soundness.
 --- (index(number) -> string) & (newindex(number, string) -> ())
 ```
 
-A Lua library for implementing static analysis of a Lua-like duck type system.
+This is bad because every type in Lua is fundamentally cyclic, via the fundamental `select` operation. Every type is able to compute `select(1, ...Type)`, which means the `is_subset` predicate would have to be able to handle cyclic cases in a fundamentally sound and computable way, which is a lot of work, the way this codebase is written (at least if I were to add a `visited` argument to every function), and may not even be possible.
+
+This is a Lua library for implementing static analysis of a Lua-like duck type system.
 
 ## Tutorial
 
