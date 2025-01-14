@@ -2,20 +2,20 @@ rockspec_format = "3.0"
 package = "type-tracker"
 version = "dev-1"
 source = {
-   url = "*** please add URL for source tarball, zip or repository here ***"
+	url = "https://github.com/goldenstein64/lua-type-track",
 }
 description = {
-   homepage = "*** please enter a project homepage ***",
-   license = "*** please specify a license ***"
+	homepage = "https://github.com/goldenstein64/lua-type-track",
+	license = "MIT",
 }
 dependencies = {
-   "lua >= 5.1",
+	"lua >= 5.1",
 }
 test_dependencies = {
-   "busted ~> 2.2",
-   "moonscript ~> 0.5",
+	"busted ~> 2.2",
+	"moonscript ~> 0.5",
 }
 build = {
-   type = "builtin",
-   modules = {}
+	type = "builtin",
+	modules = {},
 }
