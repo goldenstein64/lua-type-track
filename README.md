@@ -16,6 +16,8 @@ This is bad because every type in Lua is fundamentally cyclic, via the fundament
 
 This is a Lua library for implementing static analysis of a Lua-like duck type system.
 
+The `negation-types` branch is my attempt to write the `is_disjoint` predicate, which would be the basis for complement types, used for type refinement. Because of the fundamental undecomposable operation problem, I couldn't get very far.
+
 ## Installing
 
 These files aren't published anywhere, so just clone the repo and use LuaRocks to install dependencies:
