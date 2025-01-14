@@ -16,6 +16,19 @@ This is bad because every type in Lua is fundamentally cyclic, via the fundament
 
 This is a Lua library for implementing static analysis of a Lua-like duck type system.
 
+## Installing
+
+These files aren't published anywhere, so just clone the repo and use LuaRocks to install dependencies:
+
+```sh
+$ git clone https://github.com/goldenstein64/lua-type-track
+$ luarocks init
+$ luarocks install --deps-only ./type-track-dev-1.rockspec
+
+# for testing,
+$ luarocks test
+```
+
 ## Overview
 
 This system implements duck-typing using a set of meta-types:
